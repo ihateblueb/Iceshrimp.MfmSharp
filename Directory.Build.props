@@ -1,0 +1,28 @@
+<Project>
+    <!-- Target framework & language version -->
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!-- Common build options -->
+    <PropertyGroup>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <SatelliteResourceLanguages>none</SatelliteResourceLanguages>
+    </PropertyGroup>
+
+    <!-- Except low and medium severity vulnerable dependency warnings from TreatWarningsAsErrors, leaving high and critical severity ones intact -->
+    <PropertyGroup>
+        <WarningsNotAsErrors>$(WarningsNotAsErrors),NU1901,NU1902</WarningsNotAsErrors>
+    </PropertyGroup>
+
+    <!-- When DependencyVulnsAsError is not set, also suppress the remaining dependency vulnerability warnings -->
+    <PropertyGroup Condition="'$(DependencyVulnsAsError)' != 'true'">
+        <WarningsNotAsErrors>$(WarningsNotAsErrors),NU1903,NU1904</WarningsNotAsErrors>
+    </PropertyGroup>
+
+</Project>
