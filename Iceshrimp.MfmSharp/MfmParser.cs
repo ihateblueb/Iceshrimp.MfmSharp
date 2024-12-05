@@ -1274,7 +1274,7 @@ public static class MfmParser
 			state.Seek(delimLength);
 
 			var endIdx = sameLine
-				? state.IndexOf(delim, state.IndexOfOrNull('\n') ?? state.LastIdx)
+				? state.IndexOf(delim, state.IndexOfOrNull('\n') ?? state.Length)
 				: state.IndexOf(delim);
 
 			if (
