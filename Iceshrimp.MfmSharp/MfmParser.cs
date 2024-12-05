@@ -647,8 +647,9 @@ public static class MfmParser
 				var i = -1;
 				while (bracketStack >= 0 && ++i < slice.Length)
 				{
-					i = slice[i..].IndexOfAny(ParenthesisChars) + i;
-					if (i == -1) break;
+					var next = slice[i..].IndexOfAny(ParenthesisChars);
+					if (next == -1) break;
+					i += next;
 
 					bracketStack += slice[i] == '(' ? 1 : -1;
 					if (bracketStack == -1)
@@ -746,8 +747,9 @@ public static class MfmParser
 			var i = -1;
 			while (bracketStack >= 0 && ++i < slice.Length)
 			{
-				i = slice[i..].IndexOfAny(ParenthesisChars) + i;
-				if (i == -1) break;
+				var next = slice[i..].IndexOfAny(ParenthesisChars);
+				if (next == -1) break;
+				i += next;
 
 				bracketStack += slice[i] == '(' ? 1 : -1;
 				if (bracketStack == 0)
@@ -1348,8 +1350,6 @@ public static class MfmParser
 						var i = -1;
 						while (tagStack >= 0 && ++i < slice.Length)
 						{
-							i = slice[i..].IndexOfAny(tags) + i;
-							if (i == -1) break;
 							var next = slice[i..].IndexOfAny(tags);
 							if (next is -1)
 							{
