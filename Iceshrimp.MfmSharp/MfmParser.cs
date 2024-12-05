@@ -815,7 +815,7 @@ public static class MfmParser
 			&& localSlice.Length > 1
 			&& (".-".Contains(localSlice[^1])
 			    || (localSlice[^1] == ':'
-			        && (state.Remaining == localSlice.Length
+			        && (state.LastIdx < nextCharIdx
 			            || !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(nextCharIdx)))))
 		)
 		{
