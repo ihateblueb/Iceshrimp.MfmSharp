@@ -232,9 +232,9 @@ public static class MfmParser
 
 		private int SetLookup(string key, int val) => (_lookup ??= [])[key] = val;
 
-		public int IndexOfAny(SearchValues<char> sv, string name)
+		public int IndexOfAny(SearchValues<char> sv, string name, bool skipLookup = false)
 		{
-			if (_skipLookup || Remaining < LookupThreshold)
+			if (_skipLookup || skipLookup || Remaining < LookupThreshold)
 				return WithPosition(_stream[_position..].IndexOfAny(sv));
 
 			var key = $"IndexOfAny-{name}";
@@ -252,9 +252,9 @@ public static class MfmParser
 
 		public int IndexOfAnyBoundaryChar() => Mode switch
 		{
-			ParseMode.Full   => IndexOfAny(BoundaryCharsFull, nameof(BoundaryCharsFull)),
-			ParseMode.Inline => IndexOfAny(BoundaryCharsInline, nameof(BoundaryCharsInline)),
-			ParseMode.Simple => IndexOfAny(BoundaryCharsSimple, nameof(BoundaryCharsSimple)),
+			ParseMode.Full   => IndexOfAny(BoundaryCharsFull, nameof(BoundaryCharsFull), skipLookup: true),
+			ParseMode.Inline => IndexOfAny(BoundaryCharsInline, nameof(BoundaryCharsInline), skipLookup: true),
+			ParseMode.Simple => IndexOfAny(BoundaryCharsSimple, nameof(BoundaryCharsSimple), skipLookup: true),
 			_                => throw new ArgumentOutOfRangeException()
 		};
 
