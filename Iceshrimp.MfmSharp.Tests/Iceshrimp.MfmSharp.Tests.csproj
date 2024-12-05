@@ -1,5 +1,10 @@
 <Project Sdk="MSTest.Sdk/3.6.4">
 
+    <PropertyGroup>
+      <Configurations>Debug;Release;Fuzz</Configurations>
+      <Platforms>AnyCPU</Platforms>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="FluentAssertions" Version="7.0.0" />
     </ItemGroup>

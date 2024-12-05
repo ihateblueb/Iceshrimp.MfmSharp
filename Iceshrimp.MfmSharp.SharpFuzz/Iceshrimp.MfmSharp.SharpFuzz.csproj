@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <Configurations>Debug;Release;Fuzz</Configurations>
+        <Platforms>AnyCPU</Platforms>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="SharpFuzz" Version="2.1.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Iceshrimp.MfmSharp\Iceshrimp.MfmSharp.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="TestCases\" />
+    </ItemGroup>
+
+</Project>

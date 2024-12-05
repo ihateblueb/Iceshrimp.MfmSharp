@@ -3,6 +3,12 @@
     <PropertyGroup>
         <Version>0.0.2</Version>
         <IsPackable>true</IsPackable>
+        <Configurations>Debug;Release;Fuzz</Configurations>
+        <Platforms>AnyCPU</Platforms>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(FUZZ)' == 'true' ">
+        <DefineConstants>$(DefineConstants);FUZZ</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>

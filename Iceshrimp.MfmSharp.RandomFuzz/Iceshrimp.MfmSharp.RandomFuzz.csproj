@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <Configurations>Debug;Release;Fuzz</Configurations>
+        <Platforms>AnyCPU</Platforms>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Iceshrimp.MfmSharp\Iceshrimp.MfmSharp.csproj" />
+    </ItemGroup>
+
+</Project>

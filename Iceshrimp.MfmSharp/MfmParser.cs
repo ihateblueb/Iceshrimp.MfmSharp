@@ -23,10 +23,21 @@ public static class MfmParser
 		var processed = input.ToString().ReplaceLineEndings("\n");
 		if (processed.Length == 0) return [];
 		if (processed.Length > LengthLimit) return [new MfmTextNode(processed)];
-		var state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
-		while (!state.IsEos)
-			state = simple ? ParseNodeSimple(state) : ParseNode(state);
-		return state.GetResults();
+		#if !DEBUG && !FUZZ
+		try
+		{
+			#endif
+			var state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
+			while (!state.IsEos)
+				state = simple ? ParseNodeSimple(state) : ParseNode(state);
+			return state.GetResults();
+			#if !DEBUG && !FUZZ
+		}
+		catch
+		{
+			return [new MfmTextNode(processed)];
+		}
+		#endif
 	}
 
 	internal enum ParseMode
@@ -462,7 +473,7 @@ public static class MfmParser
 
 		if (state.Position == position)
 		{
-			#if DEBUG
+			#if DEBUG || FUZZ
 			throw new Exception("Infinite loop detected!");
 			#else
 			state.UpdatePendingTextAndSeekToBoundary();
@@ -488,7 +499,7 @@ public static class MfmParser
 
 		if (state.Position == position)
 		{
-			#if DEBUG
+			#if DEBUG || FUZZ
 			throw new Exception("Infinite loop detected!");
 			#else
 			state.UpdatePendingTextAndSeekToBoundary();
