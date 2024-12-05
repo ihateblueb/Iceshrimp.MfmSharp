@@ -743,7 +743,7 @@ public static class MfmParser
 			return state;
 		}
 
-		var openBracketIdx = state.IndexOf('(', closeBracketIdx);
+		var openBracketIdx = state.IndexOf('(', linkStart..closeBracketIdx);
 		if (openBracketIdx == -1)
 		{
 			linkEnd = closeBracketIdx;
@@ -761,11 +761,11 @@ public static class MfmParser
 				i += next;
 
 				bracketStack += slice[i] == '(' ? 1 : -1;
-				if (bracketStack == 0)
+				if (bracketStack == -1)
 					linkEnd = i + openBracketIdx;
 			}
 
-			if (bracketStack > 0)
+			if (bracketStack > -1)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
 				return state;
