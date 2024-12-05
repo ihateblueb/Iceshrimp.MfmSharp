@@ -712,7 +712,7 @@ public static class MfmParser
 			textEnd == -1
 			|| textEnd == state.Position
 			|| state.IndexOf('\n', textEnd) != -1
-			|| textEnd > state.LastIdx + "(http://)".Length
+			|| textEnd > state.LastIdx - "(http://)".Length
 			|| state.ReadAt(textEnd + 1) != '('
 		)
 		{
