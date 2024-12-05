@@ -250,6 +250,15 @@ public static class MfmParser
 			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..end].IndexOfAny(sv)));
 		}
 
+		public int IndexOfAny(SearchValues<char> sv, string name, Range range)
+		{
+			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
+				return WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value);
+
+			var key = $"IndexOfAny-{name}-{range.Start}-{range.End}";
+			return Lookup(key) ?? SetLookup(key, WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value));
+		}
+
 		public int IndexOfAnyBoundaryChar() => Mode switch
 		{
 			ParseMode.Full   => IndexOfAny(BoundaryCharsFull, nameof(BoundaryCharsFull), skipLookup: true),
@@ -722,7 +731,7 @@ public static class MfmParser
 		}
 
 		var linkStart = textEnd + 2;
-		var linkEnd   = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars));
+		var linkEnd   = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars), linkStart..);
 
 		if (linkEnd == -1)
 			linkEnd = state.Length;
