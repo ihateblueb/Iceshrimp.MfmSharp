@@ -846,13 +846,13 @@ public static class MfmParser
 				hostSlice = hostSlice[..earlyEndIdx];
 			}
 
-			if ("-.".Contains(hostSlice[^1]))
+			if (hostSlice.Length > 0 && "-.".Contains(hostSlice[^1]))
 			{
 				end--;
 				hostSlice = hostSlice[..^1];
 			}
 
-			if ("-.".Contains(hostSlice[0]) || !hostSlice.Contains('.'))
+			if (hostSlice.Length > 0 && ("-.".Contains(hostSlice[0]) || !hostSlice.Contains('.')))
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(1);
 				return state;
