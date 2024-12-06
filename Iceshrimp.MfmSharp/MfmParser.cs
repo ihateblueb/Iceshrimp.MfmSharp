@@ -1110,9 +1110,12 @@ public static class MfmParser
 		string? lang = null;
 		if (state.CurrentChar != '\n')
 		{
-			var newlineIdx = state.IndexOf('\n');
-			lang = state.ReadTo(newlineIdx).ToString();
-			state.SeekTo(newlineIdx);
+			var newlineIdx = state.IndexOf('\n', endIdx);
+			if (newlineIdx != -1)
+			{
+				lang = state.ReadTo(newlineIdx).ToString();
+				state.SeekTo(newlineIdx);
+			}
 		}
 
 		state.Seek(1);
