@@ -11,8 +11,11 @@ if (args.Contains("--validate-random"))
 
 if (args.Contains("--validate-sharpfuzz"))
 {
-	var prefix = Path.Combine("..", "..", "..", "..", "Iceshrimp.MfmSharp.SharpFuzz", "findings", "default");
-	ValidateFixes.ValidateCrashesAndSlowdowns(Directory.EnumerateDirectories(prefix, "crashes*").ToArray());
+	var prefix = Path.Combine("..", "..", "..", "..", "Iceshrimp.MfmSharp.SharpFuzz");
+	var dirs = Directory.EnumerateDirectories(prefix, "findings*")
+	                    .SelectMany(Directory.EnumerateDirectories)
+	                    .SelectMany(p => Directory.EnumerateDirectories(p, "crashes*"));
+	ValidateFixes.ValidateCrashesAndSlowdowns(dirs.ToArray());
 	return;
 }
 

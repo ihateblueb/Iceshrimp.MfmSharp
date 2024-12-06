@@ -2,7 +2,7 @@
 using Iceshrimp.MfmSharp;
 using SharpFuzz;
 
-Fuzzer.OutOfProcess.Run(input =>
+Fuzzer.Run(input =>
 {
 	var pre = Stopwatch.GetTimestamp();
 	MfmParser.Parse(input);
