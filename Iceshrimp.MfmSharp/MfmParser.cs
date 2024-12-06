@@ -1128,9 +1128,9 @@ public static class MfmParser
 
 	private static readonly Accumulator CenterAccumulator = (state, endIdx) =>
 	{
-		if (state.CurrentChar == '\n')
+		if (state.CurrentChar == '\n' && state.Position < endIdx)
 			state.Seek(1);
-		if (state.ReadAt(endIdx - 1) == '\n')
+		if (state.Position < endIdx && state.ReadAt(endIdx - 1) == '\n')
 			endIdx--;
 
 		state.AddResult(new MfmCenterNode(state.Recurse(endIdx)));
