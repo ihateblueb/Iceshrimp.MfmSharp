@@ -1107,6 +1107,9 @@ public static class MfmParser
 
 	private static readonly Accumulator CodeBlockAccumulator = (state, endIdx) =>
 	{
+		if (endIdx == state.Position)
+			return state;
+
 		string? lang = null;
 		if (state.CurrentChar != '\n')
 		{
