@@ -678,7 +678,10 @@ public static class MfmParser
 			}
 		}
 
-		if (Uri.TryCreate(state.ReadTo(end).ToString(), UriKind.Absolute, out var uri))
+		if (
+			Uri.TryCreate(state.ReadTo(end).ToString(), UriKind.Absolute, out var uri)
+			&& uri is { Scheme: "http" or "https" }
+		)
 		{
 			state.AddResult(new MfmUrlNode(uri.ToString(), false));
 			state.SeekTo(end);
@@ -702,7 +705,10 @@ public static class MfmParser
 			return state;
 		}
 
-		if (Uri.TryCreate(state.ReadTo(end).ToString(), UriKind.Absolute, out var uri))
+		if (
+			Uri.TryCreate(state.ReadTo(end).ToString(), UriKind.Absolute, out var uri)
+			&& uri is { Scheme: "http" or "https" }
+		)
 		{
 			state.AddResult(new MfmUrlNode(uri.ToString(), true));
 			state.SeekTo(end);
@@ -783,7 +789,10 @@ public static class MfmParser
 			}
 		}
 
-		if (Uri.TryCreate(state.Slice(linkStart..linkEnd).ToString(), UriKind.Absolute, out var uri))
+		if (
+			Uri.TryCreate(state.Slice(linkStart..linkEnd).ToString(), UriKind.Absolute, out var uri)
+			&& uri is { Scheme: "http" or "https" }
+		)
 		{
 			state.AddResult(new MfmLinkNode(uri.ToString(), state.ReadTo(textEnd).ToString(), silent));
 			state.SeekTo(linkEnd);
