@@ -26,12 +26,12 @@ public static class MfmParser
 		#if !DEBUG && !FUZZ
 		try
 		{
-			#endif
-			var state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
-			while (!state.IsEos)
-				state = simple ? ParseNodeSimple(state) : ParseNode(state);
-			return state.GetResults();
-			#if !DEBUG && !FUZZ
+		#endif
+		var state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
+		while (!state.IsEos)
+			state = simple ? ParseNodeSimple(state) : ParseNode(state);
+		return state.GetResults();
+		#if !DEBUG && !FUZZ
 		}
 		catch
 		{
@@ -1203,7 +1203,7 @@ public static class MfmParser
 						return state;
 					}
 
-					args.Add(arg.ToString(), null);
+					args[arg.ToString()] = null;
 					continue;
 				}
 
@@ -1215,7 +1215,7 @@ public static class MfmParser
 					return state;
 				}
 
-				args.Add(key.ToString(), value.ToString());
+				args[key.ToString()] = value.ToString();
 			}
 		}
 
