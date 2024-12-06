@@ -2,19 +2,19 @@ using System.Text;
 
 namespace Iceshrimp.MfmSharp;
 
-public abstract class MfmNode(MfmNode[] children)
+public abstract class MfmNode(MfmInlineNode[] children)
 {
-	public MfmNode[] Children => children;
+	public MfmInlineNode[] Children => children;
 
 	public static implicit operator MfmNode(string text) => new MfmTextNode(text);
 }
 
-public abstract class MfmInlineNode(MfmInlineNode[] children) : MfmNode(children.Cast<MfmNode>().ToArray())
+public abstract class MfmInlineNode(MfmInlineNode[] children) : MfmNode(children)
 {
 	public static implicit operator MfmInlineNode(string text) => new MfmTextNode(text);
 }
 
-public abstract class MfmBlockNode(MfmInlineNode[] children) : MfmNode(children.Cast<MfmNode>().ToArray());
+public abstract class MfmBlockNode(MfmInlineNode[] children) : MfmNode(children);
 
 public class MfmTextNode(string text) : MfmInlineNode([]), IEquatable<MfmTextNode>
 {
