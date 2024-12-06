@@ -10,9 +10,9 @@ public static class MfmParser
 	private const int RecursionLimit  = 20;
 	private const int LookupThreshold = 500;
 
-	public static List<IMfmNode> Parse(ReadOnlySpan<char> input) => Parse(input, false);
+	public static IMfmNode[] Parse(ReadOnlySpan<char> input) => Parse(input, false);
 
-	public static List<IMfmNode> Parse(ReadOnlySpan<char> input, bool simple)
+	public static IMfmNode[] Parse(ReadOnlySpan<char> input, bool simple)
 	{
 		input = input.Trim();
 		if (input.Length == 0) return [];
@@ -54,11 +54,14 @@ public static class MfmParser
 	{
 		// Basic private state
 		private readonly ReadOnlySpan<char> _stream      = input;
-		private readonly List<IMfmNode>     _results     = [];
 		private          bool               _closed      = false;
 		private          int                _position    = 0;
 		private          Range?             _pendingText = null;
 		private          bool               _skipLookup  = input.Length < LookupThreshold;
+
+		// These are separated to improve performance & reduce allocations
+		private AutoResizeArray<IMfmNode>       _results        = new();
+		private AutoResizeArray<IMfmInlineNode> _recurseResults = new();
 
 		// Cache for (possibly) expensive lookups
 		private Dictionary<string, int>? _lookup = null;
@@ -122,7 +125,7 @@ public static class MfmParser
 			while (!state.IsEos)
 				ParseNode(ref state);
 
-			return state.GetResults().Cast<IMfmInlineNode>().ToArray();
+			return state.GetRecurseResults();
 		}
 
 		// Pending text methods
@@ -182,23 +185,45 @@ public static class MfmParser
 		private void MaterializePendingText()
 		{
 			if (_pendingText is not { } range) return;
-			_results.Add(new MfmTextNode(_stream[range].ToString()));
+			if (depth == 0)
+				_results.Add(new MfmTextNode(_stream[range].ToString()));
+			else
+				_recurseResults.Add(new MfmTextNode(_stream[range].ToString()));
+
 			_pendingText = null;
 		}
 
 		// Result methods
-		public void AddResult(IMfmNode node)
+		public void AddBlockResult(IMfmBlockNode node)
 		{
+			if (depth != 0) throw new InvalidOperationException("Cannot add block result to recursive state");
 			MaterializePendingText();
 			_results.Add(node);
 		}
 
-		public List<IMfmNode> GetResults()
+		public void AddInlineResult(IMfmInlineNode node)
+		{
+			MaterializePendingText();
+			if (depth == 0)
+				_results.Add(node);
+			else
+				_recurseResults.Add(node);
+		}
+
+		public IMfmNode[] GetResults()
 		{
 			if (_closed) throw new InvalidOperationException("This ParserState struct has already been closed.");
 			_closed = true;
 			MaterializePendingText();
-			return _results;
+			return _results.AsArray();
+		}
+
+		public IMfmInlineNode[] GetRecurseResults()
+		{
+			if (_closed) throw new InvalidOperationException("This ParserState struct has already been closed.");
+			_closed = true;
+			MaterializePendingText();
+			return _recurseResults.AsArray();
 		}
 
 		// Match, read, slice & helper methods
@@ -574,12 +599,12 @@ public static class MfmParser
 
 		if (endIdx == -1)
 		{
-			state.AddResult(new MfmHashtagNode(state.ReadToEnd().ToString()));
+			state.AddInlineResult(new MfmHashtagNode(state.ReadToEnd().ToString()));
 			state.SeekToEnd();
 			return;
 		}
 
-		state.AddResult(new MfmHashtagNode(state.ReadTo(endIdx).ToString()));
+		state.AddInlineResult(new MfmHashtagNode(state.ReadTo(endIdx).ToString()));
 		state.SeekTo(endIdx);
 	}
 
@@ -597,7 +622,7 @@ public static class MfmParser
 			return;
 		}
 
-		state.AddResult(new MfmEmojiCodeNode(state.ReadTo(endIdx).ToString()));
+		state.AddInlineResult(new MfmEmojiCodeNode(state.ReadTo(endIdx).ToString()));
 		state.SeekTo(endIdx);
 		state.Seek(delimLength);
 	}
@@ -616,7 +641,7 @@ public static class MfmParser
 			return;
 		}
 
-		state.AddResult(new MfmInlineCodeNode(state.ReadTo(endIdx).ToString()));
+		state.AddInlineResult(new MfmInlineCodeNode(state.ReadTo(endIdx).ToString()));
 		state.SeekTo(endIdx);
 		state.Seek(delimLength);
 	}
@@ -666,7 +691,7 @@ public static class MfmParser
 			&& uri is { Scheme: "http" or "https" }
 		)
 		{
-			state.AddResult(new MfmUrlNode(uri.ToString(), false));
+			state.AddInlineResult(new MfmUrlNode(uri.ToString(), false));
 			state.SeekTo(end);
 		}
 		else
@@ -691,7 +716,7 @@ public static class MfmParser
 			&& uri is { Scheme: "http" or "https" }
 		)
 		{
-			state.AddResult(new MfmUrlNode(uri.ToString(), true));
+			state.AddInlineResult(new MfmUrlNode(uri.ToString(), true));
 			state.SeekTo(end);
 			state.Seek(1);
 		}
@@ -773,7 +798,7 @@ public static class MfmParser
 			&& uri is { Scheme: "http" or "https" }
 		)
 		{
-			state.AddResult(new MfmLinkNode(uri.ToString(), state.ReadTo(textEnd).ToString(), silent));
+			state.AddInlineResult(new MfmLinkNode(uri.ToString(), state.ReadTo(textEnd).ToString(), silent));
 			state.SeekTo(linkEnd);
 			state.Seek(1);
 		}
@@ -867,7 +892,7 @@ public static class MfmParser
 
 		var user = localSlice.ToString();
 		var host = hostSlice.Length > 0 ? hostSlice.ToString() : null;
-		state.AddResult(new MfmMentionNode(user, host));
+		state.AddInlineResult(new MfmMentionNode(user, host));
 		state.SeekTo(end);
 	}
 
@@ -917,8 +942,8 @@ public static class MfmParser
 			end = state.Length;
 
 		// @formatter:off
-		List<IMfmInlineNode> results = [];
-		Stack<(int depth, List<IMfmInlineNode> results)> stack = [];
+		AutoResizeArray<IMfmInlineNode> results = new();
+		Stack<(int depth, AutoResizeArray<IMfmInlineNode> results)> stack = [];
 		// @formatter:on
 
 		while (end != -1)
@@ -975,19 +1000,18 @@ public static class MfmParser
 						var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
 						while (--currentDepth > head.depth)
 							nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
-						results = head.results;
-						head.results.Add(nestQuote);
+						results = head.results.Add(nestQuote);
 					}
 
 					if (currentDepth > depth)
 					{
 						var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
-						results = [nestQuote];
+						results = new([nestQuote]);
 
 						while (--currentDepth > depth)
 						{
 							nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
-							results   = [nestQuote];
+							results   = new([nestQuote]);
 						}
 					}
 
@@ -996,7 +1020,7 @@ public static class MfmParser
 
 				// currentDepth is < depth
 				stack.Push((currentDepth, results));
-				results      = [];
+				results      = new();
 				currentDepth = depth;
 			}
 		}
@@ -1006,14 +1030,13 @@ public static class MfmParser
 			var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
 			while (--currentDepth > head.depth)
 				nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
-			results = head.results;
-			head.results.Add(nestQuote);
+			results = head.results.Add(nestQuote);
 		}
 
 		while (currentDepth-- > 0)
-			results = [new MfmQuoteNode(results.ToArray(), Nested: true)];
+			results = new([new MfmQuoteNode(results.ToArray(), Nested: true)]);
 
-		state.AddResult(new MfmQuoteNode(results.ToArray()));
+		state.AddInlineResult(new MfmQuoteNode(results.ToArray()));
 
 		if (lookbehind > 0)
 			state.UpdatePendingTextBehindAndSeekToBoundary(lookbehind);
@@ -1046,7 +1069,7 @@ public static class MfmParser
 			_   => MfmItalicNode.DelimiterType.HtmlTag
 		};
 
-		state.AddResult(new MfmItalicNode(state.Recurse(endIdx), type));
+		state.AddInlineResult(new MfmItalicNode(state.Recurse(endIdx), type));
 	};
 
 	private static readonly Accumulator BoldAccumulator = (ref ParserState state, int endIdx) =>
@@ -1058,7 +1081,7 @@ public static class MfmParser
 			_   => MfmBoldNode.DelimiterType.HtmlTag
 		};
 
-		state.AddResult(new MfmBoldNode(state.Recurse(endIdx), type));
+		state.AddInlineResult(new MfmBoldNode(state.Recurse(endIdx), type));
 	};
 
 	private static readonly Accumulator StrikeAccumulator = (ref ParserState state, int endIdx) =>
@@ -1069,14 +1092,14 @@ public static class MfmParser
 			_   => MfmStrikeNode.DelimiterType.HtmlTag
 		};
 
-		state.AddResult(new MfmStrikeNode(state.Recurse(endIdx), type));
+		state.AddInlineResult(new MfmStrikeNode(state.Recurse(endIdx), type));
 	};
 
 	private static readonly Accumulator InlineMathAccumulator = (ref ParserState state, int endIdx)
-		=> state.AddResult(new MfmInlineMathNode(state.ReadTo(endIdx).ToString()));
+		=> state.AddInlineResult(new MfmInlineMathNode(state.ReadTo(endIdx).ToString()));
 
 	private static readonly Accumulator MathBlockAccumulator = (ref ParserState state, int endIdx)
-		=> state.AddResult(new MfmMathBlockNode(state.ReadTo(endIdx).ToString()));
+		=> state.AddBlockResult(new MfmMathBlockNode(state.ReadTo(endIdx).ToString()));
 
 	private static readonly Accumulator CodeBlockAccumulator = (ref ParserState state, int endIdx) =>
 	{
@@ -1095,7 +1118,7 @@ public static class MfmParser
 		}
 
 		state.Seek(1);
-		state.AddResult(new MfmCodeBlockNode(state.ReadTo(endIdx).ToString(), lang));
+		state.AddBlockResult(new MfmCodeBlockNode(state.ReadTo(endIdx).ToString(), lang));
 	};
 
 	private static readonly Accumulator CenterAccumulator = (ref ParserState state, int endIdx) =>
@@ -1105,14 +1128,14 @@ public static class MfmParser
 		if (state.Position < endIdx && state.ReadAt(endIdx - 1) == '\n')
 			endIdx--;
 
-		state.AddResult(new MfmCenterNode(state.Recurse(endIdx)));
+		state.AddBlockResult(new MfmCenterNode(state.Recurse(endIdx)));
 	};
 
 	private static readonly Accumulator SmallAccumulator = (ref ParserState state, int endIdx)
-		=> state.AddResult(new MfmSmallNode(state.Recurse(endIdx)));
+		=> state.AddInlineResult(new MfmSmallNode(state.Recurse(endIdx)));
 
 	private static readonly Accumulator PlainAccumulator = (ref ParserState state, int endIdx)
-		=> state.AddResult(new MfmPlainNode(state.ReadTo(endIdx).ToString()));
+		=> state.AddInlineResult(new MfmPlainNode(state.ReadTo(endIdx).ToString()));
 
 	private static readonly Accumulator FnAccumulator = (ref ParserState state, int endIdx) =>
 	{
@@ -1189,7 +1212,7 @@ public static class MfmParser
 
 		state.SeekTo(descriptorEndIdx);
 		state.Seek(1);
-		state.AddResult(new MfmFnNode(name.ToString(), args, state.Recurse(endIdx)));
+		state.AddInlineResult(new MfmFnNode(name.ToString(), args, state.Recurse(endIdx)));
 		state.SeekTo(endIdx);
 		state.Seek(1);
 	};
