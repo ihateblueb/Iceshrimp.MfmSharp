@@ -11,7 +11,7 @@ public class MfmTests
 	[TestInitialize]
 	public void Initialize() => AssertionOptions.FormattingOptions.MaxDepth = 100;
 
-	private static void AssertEquals(string input, List<MfmNode> expected, string? canonical = null)
+	private static void AssertEquals(string input, List<IMfmNode> expected, string? canonical = null)
 	{
 		var res = MfmParser.Parse(input);
 		res.Should().Equal(expected);
@@ -26,7 +26,7 @@ public class MfmTests
 	}
 
 	[TestMethod]
-	public void TestParseBoundaryChars() => AssertEquals("test:", ["test:"]);
+	public void TestParseBoundaryChars() => AssertEquals("test:", ["test:".ToMfm()]);
 
 	[TestMethod]
 	public void TestParseEmptyTag()
@@ -37,19 +37,19 @@ public class MfmTests
 	{
 		AssertEquals("<b><b>a</b></b>",
 		[
-			new MfmBoldNode([new MfmBoldNode(["a"], MfmBoldNode.DelimiterType.HtmlTag)],
+			new MfmBoldNode([new MfmBoldNode(["a".ToMfm()], MfmBoldNode.DelimiterType.HtmlTag)],
 			                MfmBoldNode.DelimiterType.HtmlTag)
 		]);
 
 		AssertEquals("<b><b><b>a</b></b></b>",
 		[
 			new MfmBoldNode(
-			[ //
+			[
 				new MfmBoldNode(
-				[ //
+				[
 					new MfmBoldNode(
 					[ //
-						"a"
+						"a".ToMfm()
 					], MfmBoldNode.DelimiterType.HtmlTag)
 				], MfmBoldNode.DelimiterType.HtmlTag)
 			], MfmBoldNode.DelimiterType.HtmlTag)
@@ -58,14 +58,14 @@ public class MfmTests
 		AssertEquals("<b><b><b><b>a</b></b></b></b>",
 		[
 			new MfmBoldNode(
-			[ //
+			[
 				new MfmBoldNode(
-				[ //
+				[
 					new MfmBoldNode(
-					[ //
+					[
 						new MfmBoldNode(
 						[ //
-							"a"
+							"a".ToMfm()
 						], MfmBoldNode.DelimiterType.HtmlTag)
 					], MfmBoldNode.DelimiterType.HtmlTag)
 				], MfmBoldNode.DelimiterType.HtmlTag)
@@ -76,94 +76,129 @@ public class MfmTests
 	[TestMethod]
 	public void TestParseUnmatchedNestedTag()
 	{
-		AssertEquals("<b><b>a</b>",
-		             [new MfmBoldNode(["<b>a"], MfmBoldNode.DelimiterType.HtmlTag)]);
+		AssertEquals("<b><b>a</b>", [new MfmBoldNode(["<b>a".ToMfm()], MfmBoldNode.DelimiterType.HtmlTag)]);
 	}
 
 	[TestMethod]
 	public void TestParseItalic()
 	{
-		List<MfmNode> expected = ["test ", new MfmItalicNode(["test"], MfmItalicNode.DelimiterType.Asterisk), " test"];
+		List<IMfmNode> expected =
+		[
+			"test ".ToMfm(),
+			new MfmItalicNode(["test".ToMfm()], MfmItalicNode.DelimiterType.Asterisk),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test *test* test", expected);
 
-		expected = ["test ", new MfmItalicNode(["test"], MfmItalicNode.DelimiterType.Underscore), " test"];
+		expected =
+		[
+			"test ".ToMfm(),
+			new MfmItalicNode(["test".ToMfm()], MfmItalicNode.DelimiterType.Underscore),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test _test_ test", expected);
 
-		expected = ["test *test\ntest* test"];
+		expected = ["test *test\ntest* test".ToMfm()];
 		AssertEquals("test *test\ntest* test", expected);
 
-		expected = ["test _test\ntest_ test"];
+		expected = ["test _test\ntest_ test".ToMfm()];
 		AssertEquals("test _test\ntest_ test", expected);
 
-		expected = ["test ", new MfmItalicNode(["test"], MfmItalicNode.DelimiterType.HtmlTag), " test"];
+		expected =
+		[
+			"test ".ToMfm(),
+			new MfmItalicNode(["test".ToMfm()], MfmItalicNode.DelimiterType.HtmlTag),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test <i>test</i> test", expected);
 
-		expected = ["test ", new MfmItalicNode(["test\ntest"], MfmItalicNode.DelimiterType.HtmlTag), " test"];
+		expected =
+		[
+			"test ".ToMfm(),
+			new MfmItalicNode(["test\ntest".ToMfm()], MfmItalicNode.DelimiterType.HtmlTag),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test <i>test\ntest</i> test", expected);
 
 		// False positives
-		AssertEquals("test*test*test", ["test*test*test"]);
-		AssertEquals("test_test_test", ["test_test_test"]);
+		AssertEquals("test*test*test", ["test*test*test".ToMfm()]);
+		AssertEquals("test_test_test", ["test_test_test".ToMfm()]);
 
-		AssertEquals("test*test* test", ["test*test* test"]);
-		AssertEquals("test_test_ test", ["test_test_ test"]);
+		AssertEquals("test*test* test", ["test*test* test".ToMfm()]);
+		AssertEquals("test_test_ test", ["test_test_ test".ToMfm()]);
 
-		AssertEquals("test *test*test", ["test *test*test"]);
-		AssertEquals("test _test_test", ["test _test_test"]);
+		AssertEquals("test *test*test", ["test *test*test".ToMfm()]);
+		AssertEquals("test _test_test", ["test _test_test".ToMfm()]);
 
-		AssertEquals("* test\n* test2\n* test3", ["* test\n* test2\n* test3"]);
+		AssertEquals("* test\n* test2\n* test3", ["* test\n* test2\n* test3".ToMfm()]);
 	}
 
 	[TestMethod]
 	public void TestParseBold()
 	{
-		List<MfmNode> expected = ["test ", new MfmBoldNode(["test"], MfmBoldNode.DelimiterType.Asterisk), " test"];
+		List<IMfmNode> expected =
+		[
+			"test ".ToMfm(), new MfmBoldNode(["test".ToMfm()], MfmBoldNode.DelimiterType.Asterisk), " test".ToMfm()
+		];
 
 		AssertEquals("test **test** test", expected);
 
-		expected = ["test ", new MfmBoldNode(["test"], MfmBoldNode.DelimiterType.Underscore), " test"];
+		expected =
+		[
+			"test ".ToMfm(),
+			new MfmBoldNode(["test".ToMfm()], MfmBoldNode.DelimiterType.Underscore),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test __test__ test", expected);
 
-		expected = ["test **test\ntest** test"];
+		expected = ["test **test\ntest** test".ToMfm()];
 		AssertEquals("test **test\ntest** test", expected);
 
-		expected = ["test __test\ntest__ test"];
+		expected = ["test __test\ntest__ test".ToMfm()];
 		AssertEquals("test __test\ntest__ test", expected);
 
-		expected = ["test ", new MfmBoldNode(["test"], MfmBoldNode.DelimiterType.HtmlTag), " test"];
+		expected =
+		[
+			"test ".ToMfm(), new MfmBoldNode(["test".ToMfm()], MfmBoldNode.DelimiterType.HtmlTag), " test".ToMfm()
+		];
 
 		AssertEquals("test <b>test</b> test", expected);
 
-		expected = ["test ", new MfmBoldNode(["test\ntest"], MfmBoldNode.DelimiterType.HtmlTag), " test"];
+		expected =
+		[
+			"test ".ToMfm(),
+			new MfmBoldNode(["test\ntest".ToMfm()], MfmBoldNode.DelimiterType.HtmlTag),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test <b>test\ntest</b> test", expected);
 
 		// False positives
-		AssertEquals("test**test**test", ["test**test**test"]);
-		AssertEquals("test__test__test", ["test__test__test"]);
+		AssertEquals("test**test**test", ["test**test**test".ToMfm()]);
+		AssertEquals("test__test__test", ["test__test__test".ToMfm()]);
 
-		AssertEquals("test**test** test", ["test**test** test"]);
-		AssertEquals("test__test__ test", ["test__test__ test"]);
+		AssertEquals("test**test** test", ["test**test** test".ToMfm()]);
+		AssertEquals("test__test__ test", ["test__test__ test".ToMfm()]);
 
-		AssertEquals("test **test**test", ["test **test**test"]);
-		AssertEquals("test __test__test", ["test __test__test"]);
+		AssertEquals("test **test**test", ["test **test**test".ToMfm()]);
+		AssertEquals("test __test__test", ["test __test__test".ToMfm()]);
 	}
 
 	[TestMethod]
 	public void TestParseBoldItalic()
 	{
 		// @formatter:off
-		List<MfmNode> expected =
+		List<IMfmNode> expected =
 		[
 			new MfmItalicNode([
-				"italic ",
-				new MfmBoldNode(["bold"], MfmBoldNode.DelimiterType.Asterisk),
-				" italic"
+				"italic ".ToMfm(),
+				new MfmBoldNode(["bold".ToMfm()], MfmBoldNode.DelimiterType.Asterisk),
+				" italic".ToMfm()
 			], MfmItalicNode.DelimiterType.Asterisk)
 		];
 		// @formatter:on
@@ -174,25 +209,38 @@ public class MfmTests
 	[TestMethod]
 	public void TestParseStrike()
 	{
-		List<MfmNode> expected = ["test ", new MfmStrikeNode(["test"], MfmStrikeNode.DelimiterType.Tilde), " test"];
+		List<IMfmNode> expected =
+		[
+			"test ".ToMfm(), new MfmStrikeNode(["test".ToMfm()], MfmStrikeNode.DelimiterType.Tilde), " test".ToMfm()
+		];
 
 		AssertEquals("test ~~test~~ test", expected);
 
-		expected = ["test ~~test\ntest~~ test"];
+		expected = ["test ~~test\ntest~~ test".ToMfm()];
 		AssertEquals("test ~~test\ntest~~ test", expected);
 
-		expected = ["test ", new MfmStrikeNode(["test"], MfmStrikeNode.DelimiterType.HtmlTag), " test"];
+		expected =
+		[
+			"test ".ToMfm(),
+			new MfmStrikeNode(["test".ToMfm()], MfmStrikeNode.DelimiterType.HtmlTag),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test <s>test</s> test", expected);
 
-		expected = ["test ", new MfmStrikeNode(["test\ntest"], MfmStrikeNode.DelimiterType.HtmlTag), " test"];
+		expected =
+		[
+			"test ".ToMfm(),
+			new MfmStrikeNode(["test\ntest".ToMfm()], MfmStrikeNode.DelimiterType.HtmlTag),
+			" test".ToMfm()
+		];
 
 		AssertEquals("test <s>test\ntest</s> test", expected);
 
 		// False positives
-		AssertEquals("test~~test~~test", ["test~~test~~test"]);
-		AssertEquals("test~~test~~ test", ["test~~test~~ test"]);
-		AssertEquals("test ~~test~~test", ["test ~~test~~test"]);
+		AssertEquals("test~~test~~test", ["test~~test~~test".ToMfm()]);
+		AssertEquals("test~~test~~ test", ["test~~test~~ test".ToMfm()]);
+		AssertEquals("test ~~test~~test", ["test ~~test~~test".ToMfm()]);
 	}
 
 	[TestMethod]
@@ -200,59 +248,58 @@ public class MfmTests
 	{
 		// General hashtag handling
 		AssertEquals("#test", [new MfmHashtagNode("test")]);
-		AssertEquals("#test's", [new MfmHashtagNode("test"), "'s"]);
-		AssertEquals("#t-e_s-t.", [new MfmHashtagNode("t-e_s-t"), "."]);
+		AssertEquals("#test's", [new MfmHashtagNode("test"), "'s".ToMfm()]);
+		AssertEquals("#t-e_s-t.", [new MfmHashtagNode("t-e_s-t"), ".".ToMfm()]);
 
 		// False positives
-		AssertEquals("#", ["#"]);
-		AssertEquals("##", ["##"]);
-		AssertEquals("test # test", ["test # test"]);
+		AssertEquals("#", ["#".ToMfm()]);
+		AssertEquals("##", ["##".ToMfm()]);
+		AssertEquals("test # test", ["test # test".ToMfm()]);
 
 		// Whitespace handling
-		AssertEquals("#test test", [new MfmHashtagNode("test"), " test"]);
-		AssertEquals("test #test", ["test ", new MfmHashtagNode("test")]);
-		AssertEquals("test #test test",
-		             ["test ", new MfmHashtagNode("test"), " test"]);
+		AssertEquals("#test test", [new MfmHashtagNode("test"), " test".ToMfm()]);
+		AssertEquals("test #test", ["test ".ToMfm(), new MfmHashtagNode("test")]);
+		AssertEquals("test #test test", ["test ".ToMfm(), new MfmHashtagNode("test"), " test".ToMfm()]);
 	}
 
 	[TestMethod]
 	public void TestParseEmojiCode()
 	{
-		List<MfmNode> expected =
+		List<IMfmNode> expected =
 		[
 			new MfmEmojiCodeNode("test"),
-			" test ",
+			" test ".ToMfm(),
 			new MfmEmojiCodeNode("test"),
 			new MfmEmojiCodeNode("test"),
-			" :",
+			" :".ToMfm(),
 			new MfmEmojiCodeNode("test"),
-			": :test*test: ",
+			": :test*test: ".ToMfm(),
 			new MfmEmojiCodeNode("test")
 		];
 
 		AssertEquals(":test: test :test::test: ::test:: :test*test: :test:", expected);
-		AssertEquals(":test\ntest:", [":test\ntest:"]);
-		AssertEquals(":test\n:", [":test\n:"]);
+		AssertEquals(":test\ntest:", [":test\ntest:".ToMfm()]);
+		AssertEquals(":test\n:", [":test\n:".ToMfm()]);
 	}
 
 	[TestMethod]
 	public void TestParseInlineCode()
 	{
-		List<MfmNode> expected =
+		List<IMfmNode> expected =
 		[
 			new MfmInlineCodeNode("test"),
-			" test ",
+			" test ".ToMfm(),
 			new MfmInlineCodeNode("test"),
 			new MfmInlineCodeNode("test"),
-			" `",
+			" `".ToMfm(),
 			new MfmInlineCodeNode("test"),
-			" ",
+			" ".ToMfm(),
 			new MfmInlineCodeNode("test")
 		];
 
 		AssertEquals("`test` test `test``test` ``test` `test`", expected);
-		AssertEquals("`test\ntest`", ["`test\ntest`"]);
-		AssertEquals("`test\n`", ["`test\n`"]);
+		AssertEquals("`test\ntest`", ["`test\ntest`".ToMfm()]);
+		AssertEquals("`test\n`", ["`test\n`".ToMfm()]);
 	}
 
 	[TestMethod]
@@ -267,30 +314,28 @@ public class MfmTests
 		             "```lang\nhello\n```\n\n```\nhello\n```");
 
 		// Whitespace & newline handling
-		AssertEquals("test ```lang\nhello\n```", ["test ```lang\nhello\n```"]);
-		AssertEquals("test ```hello``` test",
-		             ["test ``", new MfmInlineCodeNode("hello"), "`` test"]);
+		AssertEquals("test ```lang\nhello\n```", ["test ```lang\nhello\n```".ToMfm()]);
+		AssertEquals("test ```hello``` test", ["test ``".ToMfm(), new MfmInlineCodeNode("hello"), "`` test".ToMfm()]);
 	}
 
 	[TestMethod]
 	public void TestParseCenter()
 	{
-		AssertEquals("<center>test</center>", [new MfmCenterNode(["test"])],
-		             "<center>\ntest\n</center>");
-		AssertEquals("<center>test\ntest</center>", [new MfmCenterNode(["test\ntest"])],
+		AssertEquals("<center>test</center>", [new MfmCenterNode(["test".ToMfm()])], "<center>\ntest\n</center>");
+		AssertEquals("<center>test\ntest</center>", [new MfmCenterNode(["test\ntest".ToMfm()])],
 		             "<center>\ntest\ntest\n</center>");
 
 		AssertEquals("*<center>test</center>*",
-		             [new MfmItalicNode(["<center>test</center>"], MfmItalicNode.DelimiterType.Asterisk)]);
+		             [new MfmItalicNode(["<center>test</center>".ToMfm()], MfmItalicNode.DelimiterType.Asterisk)]);
 
-		AssertEquals("test <center>test</center> test", ["test <center>test</center> test"]);
+		AssertEquals("test <center>test</center> test", ["test <center>test</center> test".ToMfm()]);
 	}
 
 	[TestMethod]
 	public void TestParseInlineMath()
 	{
 		AssertEquals("\\(test\\)", [new MfmInlineMathNode("test")]);
-		AssertEquals("\\(test\ntest\\)", ["\\(test\ntest\\)"]);
+		AssertEquals("\\(test\ntest\\)", ["\\(test\ntest\\)".ToMfm()]);
 	}
 
 	[TestMethod]
@@ -303,12 +348,12 @@ public class MfmTests
 	[TestMethod]
 	public void TestParseSmall()
 	{
-		AssertEquals("<small>test</small>", [new MfmSmallNode(["test"])]);
-		AssertEquals("<small>test\ntest</small>", [new MfmSmallNode(["test\ntest"])]);
+		AssertEquals("<small>test</small>", [new MfmSmallNode(["test".ToMfm()])]);
+		AssertEquals("<small>test\ntest</small>", [new MfmSmallNode(["test\ntest".ToMfm()])]);
 
-		List<MfmNode> expected =
+		List<IMfmNode> expected =
 		[
-			new MfmItalicNode([new MfmSmallNode(["test"])], MfmItalicNode.DelimiterType.Asterisk)
+			new MfmItalicNode([new MfmSmallNode(["test".ToMfm()])], MfmItalicNode.DelimiterType.Asterisk)
 		];
 
 		AssertEquals("*<small>test</small>*", expected);
@@ -320,7 +365,7 @@ public class MfmTests
 		AssertEquals("<plain>test</plain>", [new MfmPlainNode("test")]);
 		AssertEquals("<plain>test\ntest</plain>", [new MfmPlainNode("test\ntest")]);
 
-		List<MfmNode> expected = [new MfmItalicNode([new MfmPlainNode("test")], MfmItalicNode.DelimiterType.Asterisk)];
+		List<IMfmNode> expected = [new MfmItalicNode([new MfmPlainNode("test")], MfmItalicNode.DelimiterType.Asterisk)];
 		AssertEquals("*<plain>test</plain>*", expected);
 	}
 
@@ -336,26 +381,30 @@ public class MfmTests
 
 		// Parenthesis tracking
 		AssertEquals("https://example.org/(test", [new MfmUrlNode("https://example.org/(test", false)]);
-		AssertEquals("https://example.org/te)st", [new MfmUrlNode("https://example.org/te", false), ")st"]);
+		AssertEquals("https://example.org/te)st", [new MfmUrlNode("https://example.org/te", false), ")st".ToMfm()]);
 
-		AssertEquals("(https://example.org)", ["(", new MfmUrlNode("https://example.org/", false), ")"],
+		AssertEquals("(https://example.org)", ["(".ToMfm(), new MfmUrlNode("https://example.org/", false), ")".ToMfm()],
 		             "(https://example.org/)");
 
-		AssertEquals("(https://example.org/(asd))", ["(", new MfmUrlNode("https://example.org/(asd)", false), ")"]);
-		AssertEquals("(https://example.org/((asd)))", ["(", new MfmUrlNode("https://example.org/((asd))", false), ")"]);
-		AssertEquals("(https://example.org/((asd))", ["(", new MfmUrlNode("https://example.org/((asd))", false)]);
+		AssertEquals("(https://example.org/(asd))",
+		             ["(".ToMfm(), new MfmUrlNode("https://example.org/(asd)", false), ")".ToMfm()]);
+		AssertEquals("(https://example.org/((asd)))",
+		             ["(".ToMfm(), new MfmUrlNode("https://example.org/((asd))", false), ")".ToMfm()]);
+		AssertEquals("(https://example.org/((asd))",
+		             ["(".ToMfm(), new MfmUrlNode("https://example.org/((asd))", false)]);
 
 		// Newline handling
-		AssertEquals("https://test.com/asd\nasd", [new MfmUrlNode("https://test.com/asd", false), "\nasd"]);
+		AssertEquals("https://test.com/asd\nasd", [new MfmUrlNode("https://test.com/asd", false), "\nasd".ToMfm()]);
 
 		// Whitespace handling
-		AssertEquals("test http://example.org test", ["test ", new MfmUrlNode("http://example.org/", false), " test"],
+		AssertEquals("test http://example.org test",
+		             ["test ".ToMfm(), new MfmUrlNode("http://example.org/", false), " test".ToMfm()],
 		             "test http://example.org/ test");
 
-		AssertEquals("http://example.org test", [new MfmUrlNode("http://example.org/", false), " test"],
+		AssertEquals("http://example.org test", [new MfmUrlNode("http://example.org/", false), " test".ToMfm()],
 		             "http://example.org/ test");
 
-		AssertEquals("test http://example.org", ["test ", new MfmUrlNode("http://example.org/", false)],
+		AssertEquals("test http://example.org", ["test ".ToMfm(), new MfmUrlNode("http://example.org/", false)],
 		             "test http://example.org/");
 	}
 
@@ -372,25 +421,30 @@ public class MfmTests
 		AssertEquals("<https://example.org/asd.>", [new MfmUrlNode("https://example.org/asd.", true)]);
 
 		// Parenthesis tracking
-		AssertEquals("(<https://example.org>)", ["(", new MfmUrlNode("https://example.org/", true), ")"],
+		AssertEquals("(<https://example.org>)",
+		             ["(".ToMfm(), new MfmUrlNode("https://example.org/", true), ")".ToMfm()],
 		             "(<https://example.org/>)");
 
-		AssertEquals("(<https://example.org/(asd)>)", ["(", new MfmUrlNode("https://example.org/(asd)", true), ")"]);
+		AssertEquals("(<https://example.org/(asd)>)",
+		             ["(".ToMfm(), new MfmUrlNode("https://example.org/(asd)", true), ")".ToMfm()]);
 		AssertEquals("(<https://example.org/((asd))>)",
-		             ["(", new MfmUrlNode("https://example.org/((asd))", true), ")"]);
-		AssertEquals("(<https://example.org/((asd)>)", ["(", new MfmUrlNode("https://example.org/((asd)", true), ")"]);
+		             ["(".ToMfm(), new MfmUrlNode("https://example.org/((asd))", true), ")".ToMfm()]);
+		AssertEquals("(<https://example.org/((asd)>)",
+		             ["(".ToMfm(), new MfmUrlNode("https://example.org/((asd)", true), ")".ToMfm()]);
 
 		// Newline handling
-		AssertEquals("<https://test.com/asd\nasd>", ["<", new MfmUrlNode("https://test.com/asd", false), "\nasd>"]);
+		AssertEquals("<https://test.com/asd\nasd>",
+		             ["<".ToMfm(), new MfmUrlNode("https://test.com/asd", false), "\nasd>".ToMfm()]);
 
 		// Whitespace handling
-		AssertEquals("test <http://example.org> test", ["test ", new MfmUrlNode("http://example.org/", true), " test"],
+		AssertEquals("test <http://example.org> test",
+		             ["test ".ToMfm(), new MfmUrlNode("http://example.org/", true), " test".ToMfm()],
 		             "test <http://example.org/> test");
 
-		AssertEquals("<http://example.org> test", [new MfmUrlNode("http://example.org/", true), " test"],
+		AssertEquals("<http://example.org> test", [new MfmUrlNode("http://example.org/", true), " test".ToMfm()],
 		             "<http://example.org/> test");
 
-		AssertEquals("test <http://example.org>", ["test ", new MfmUrlNode("http://example.org/", true)],
+		AssertEquals("test <http://example.org>", ["test ".ToMfm(), new MfmUrlNode("http://example.org/", true)],
 		             "test <http://example.org/>");
 	}
 
@@ -410,42 +464,43 @@ public class MfmTests
 		AssertEquals("[test](https://example.org/asd.)", [new MfmLinkNode("https://example.org/asd.", "test", false)]);
 
 		// Parenthesis tracking
-		AssertEquals("[test]https://example.org/a)", ["[test]", new MfmUrlNode("https://example.org/a", false), ")"]);
+		AssertEquals("[test]https://example.org/a)",
+		             ["[test]".ToMfm(), new MfmUrlNode("https://example.org/a", false), ")".ToMfm()]);
 
 		AssertEquals("[test](https://example.org/a_(test)",
-		             ["[test](", new MfmUrlNode("https://example.org/a_(test)", false)]);
+		             ["[test](".ToMfm(), new MfmUrlNode("https://example.org/a_(test)", false)]);
 
 		AssertEquals("([test](https://example.org))",
-		             ["(", new MfmLinkNode("https://example.org/", "test", false), ")"],
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/", "test", false), ")".ToMfm()],
 		             "([test](https://example.org/))");
 
 		AssertEquals("([test](https://example.org/(asd)))",
-		             ["(", new MfmLinkNode("https://example.org/(asd)", "test", false), ")"]);
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/(asd)", "test", false), ")".ToMfm()]);
 
 		AssertEquals("([test](https://example.org/((asd))))",
-		             ["(", new MfmLinkNode("https://example.org/((asd))", "test", false), ")"]);
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/((asd))", "test", false), ")".ToMfm()]);
 
 		AssertEquals("([test](https://example.org/((asd)))",
-		             ["(", new MfmLinkNode("https://example.org/((asd))", "test", false)]);
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/((asd))", "test", false)]);
 
 		// Newline handling
 		AssertEquals("[test](https://test.com/asd\nasd)",
-		             ["[test](", new MfmUrlNode("https://test.com/asd", false), "\nasd)"]);
+		             ["[test](".ToMfm(), new MfmUrlNode("https://test.com/asd", false), "\nasd)".ToMfm()]);
 
 		AssertEquals("[test\ntest](https://test.com/asd)",
-		             ["[test\ntest](", new MfmUrlNode("https://test.com/asd", false), ")"]);
+		             ["[test\ntest](".ToMfm(), new MfmUrlNode("https://test.com/asd", false), ")".ToMfm()]);
 
 		// Whitespace handling
 		AssertEquals("test [test](http://example.org) test",
-		             ["test ", new MfmLinkNode("http://example.org/", "test", false), " test"],
+		             ["test ".ToMfm(), new MfmLinkNode("http://example.org/", "test", false), " test".ToMfm()],
 		             "test [test](http://example.org/) test");
 
 		AssertEquals("[test](http://example.org) test",
-		             [new MfmLinkNode("http://example.org/", "test", false), " test"],
+		             [new MfmLinkNode("http://example.org/", "test", false), " test".ToMfm()],
 		             "[test](http://example.org/) test");
 
 		AssertEquals("test [test](http://example.org)",
-		             ["test ", new MfmLinkNode("http://example.org/", "test", false)],
+		             ["test ".ToMfm(), new MfmLinkNode("http://example.org/", "test", false)],
 		             "test [test](http://example.org/)");
 	}
 
@@ -455,7 +510,6 @@ public class MfmTests
 		// General url handling
 		AssertEquals("?[test](http://example.org)", [new MfmLinkNode("http://example.org/", "test", true)],
 		             "?[test](http://example.org/)");
-
 		AssertEquals("?[test](https://example.org)", [new MfmLinkNode("https://example.org/", "test", true)],
 		             "?[test](https://example.org/)");
 		AssertEquals("?[test](https://example.org.)", [new MfmLinkNode("https://example.org./", "test", true)],
@@ -466,36 +520,36 @@ public class MfmTests
 
 		// Parenthesis tracking
 		AssertEquals("(?[test](https://example.org))",
-		             ["(", new MfmLinkNode("https://example.org/", "test", true), ")"],
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/", "test", true), ")".ToMfm()],
 		             "(?[test](https://example.org/))");
 
 		AssertEquals("(?[test](https://example.org/(asd)))",
-		             ["(", new MfmLinkNode("https://example.org/(asd)", "test", true), ")"]);
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/(asd)", "test", true), ")".ToMfm()]);
 
 		AssertEquals("(?[test](https://example.org/((asd))))",
-		             ["(", new MfmLinkNode("https://example.org/((asd))", "test", true), ")"]);
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/((asd))", "test", true), ")".ToMfm()]);
 
 		AssertEquals("(?[test](https://example.org/((asd)))",
-		             ["(", new MfmLinkNode("https://example.org/((asd))", "test", true)]);
+		             ["(".ToMfm(), new MfmLinkNode("https://example.org/((asd))", "test", true)]);
 
 		// Newline handling
 		AssertEquals("?[test](https://test.com/asd\nasd)",
-		             ["?[test](", new MfmUrlNode("https://test.com/asd", false), "\nasd)"]);
+		             ["?[test](".ToMfm(), new MfmUrlNode("https://test.com/asd", false), "\nasd)".ToMfm()]);
 
 		AssertEquals("?[test\ntest](https://test.com/asd)",
-		             ["?[test\ntest](", new MfmUrlNode("https://test.com/asd", false), ")"]);
+		             ["?[test\ntest](".ToMfm(), new MfmUrlNode("https://test.com/asd", false), ")".ToMfm()]);
 
 		// Whitespace handling
 		AssertEquals("test ?[test](http://example.org) test",
-		             ["test ", new MfmLinkNode("http://example.org/", "test", true), " test"],
+		             ["test ".ToMfm(), new MfmLinkNode("http://example.org/", "test", true), " test".ToMfm()],
 		             "test ?[test](http://example.org/) test");
 
 		AssertEquals("?[test](http://example.org) test",
-		             [new MfmLinkNode("http://example.org/", "test", true), " test"],
+		             [new MfmLinkNode("http://example.org/", "test", true), " test".ToMfm()],
 		             "?[test](http://example.org/) test");
 
 		AssertEquals("test ?[test](http://example.org)",
-		             ["test ", new MfmLinkNode("http://example.org/", "test", true)],
+		             ["test ".ToMfm(), new MfmLinkNode("http://example.org/", "test", true)],
 		             "test ?[test](http://example.org/)");
 	}
 
@@ -509,49 +563,58 @@ public class MfmTests
 		AssertEquals("@_test", [new MfmMentionNode("_test", null)]);
 		AssertEquals("@test_@ins-tance.tld", [new MfmMentionNode("test_", "ins-tance.tld")]);
 		AssertEquals("@_test@xn--mastodn-f1a.de", [new MfmMentionNode("_test", "xn--mastodn-f1a.de")]);
-		AssertEquals("@_test@-xn--mastodn-f1a.de", ["@_test@-xn--mastodn-f1a.de"]);
+		AssertEquals("@_test@-xn--mastodn-f1a.de", ["@_test@-xn--mastodn-f1a.de".ToMfm()]);
 
 		// False positives
-		AssertEquals("@", ["@"]);
-		AssertEquals("@@", ["@@"]);
-		AssertEquals("@@test", ["@@test"]);
-		AssertEquals("@test@", ["@test@"]);
-		AssertEquals("test @ test", ["test @ test"]);
-		AssertEquals("test @test@ test", ["test @test@ test"]);
-		AssertEquals("@test:test.com", ["@test:test.com"]);
+		AssertEquals("@", ["@".ToMfm()]);
+		AssertEquals("@@", ["@@".ToMfm()]);
+		AssertEquals("@@test", ["@@test".ToMfm()]);
+		AssertEquals("@test@", ["@test@".ToMfm()]);
+		AssertEquals("test @ test", ["test @ test".ToMfm()]);
+		AssertEquals("test @test@ test", ["test @test@ test".ToMfm()]);
+		AssertEquals("@test:test.com", ["@test:test.com".ToMfm()]);
 
 		// Trailing colon
-		AssertEquals("@test:", [new MfmMentionNode("test", null), ":"]);
-		AssertEquals("@test:\ntest", [new MfmMentionNode("test", null), ":\ntest"]);
-		AssertEquals("@test@test.com:", [new MfmMentionNode("test", "test.com"), ":"]);
-		AssertEquals("@test@test.com:\ntest", [new MfmMentionNode("test", "test.com"), ":\ntest"]);
+		AssertEquals("@test:", [new MfmMentionNode("test", null), ":".ToMfm()]);
+		AssertEquals("@test:\ntest", [new MfmMentionNode("test", null), ":\ntest".ToMfm()]);
+		AssertEquals("@test@test.com:", [new MfmMentionNode("test", "test.com"), ":".ToMfm()]);
+		AssertEquals("@test@test.com:\ntest", [new MfmMentionNode("test", "test.com"), ":\ntest".ToMfm()]);
 
 		// Trailing dot
-		AssertEquals("@test@asdf.com.", [new MfmMentionNode("test", "asdf.com"), "."]);
-		AssertEquals("@test.", [new MfmMentionNode("test", null), "."]);
+		AssertEquals("@test@asdf.com.", [new MfmMentionNode("test", "asdf.com"), ".".ToMfm()]);
+		AssertEquals("@test.", [new MfmMentionNode("test", null), ".".ToMfm()]);
 
 		// Whitespace handling
-		AssertEquals("test @test", ["test ", new MfmMentionNode("test", null)]);
-		AssertEquals("@test test", [new MfmMentionNode("test", null), " test"]);
-		AssertEquals("test @test test", ["test ", new MfmMentionNode("test", null), " test"]);
+		AssertEquals("test @test", ["test ".ToMfm(), new MfmMentionNode("test", null)]);
+		AssertEquals("@test test", [new MfmMentionNode("test", null), " test".ToMfm()]);
+		AssertEquals("test @test test", ["test ".ToMfm(), new MfmMentionNode("test", null), " test".ToMfm()]);
 
 		// Newline handling
-		AssertEquals("@te\nst", [new MfmMentionNode("te", null), "\nst"]);
-		AssertEquals("@test@instan\nce.tld", ["@test@instan\nce.tld"]);
+		AssertEquals("@te\nst", [new MfmMentionNode("te", null), "\nst".ToMfm()]);
+		AssertEquals("@test@instan\nce.tld", ["@test@instan\nce.tld".ToMfm()]);
 
 		// Parenthesis handling
-		AssertEquals("(@test@domain.tld)", ["(", new MfmMentionNode("test", "domain.tld"), ")"]);
+		AssertEquals("(@test@domain.tld)", ["(".ToMfm(), new MfmMentionNode("test", "domain.tld"), ")".ToMfm()]);
 	}
 
 	[TestMethod]
 	public void TestParseQuote()
 	{
-		//AssertEquals(">test", [new MfmQuoteNode(["test"])], "> test");
-		//AssertEquals("> test", [new MfmQuoteNode(["test"])]);
-		//AssertEquals("> test\n> test", [new MfmQuoteNode(["test", "\n", "test"])]);
-		//AssertEquals(">test\n>\n>test", [new MfmQuoteNode(["test", "\n", "\n", "test"])], "> test\n> \n> test");
-		//AssertEquals(">\n>test", [">\n", new MfmQuoteNode(["test"])], ">\n> test");
-		AssertEquals(">test\n>", [new MfmQuoteNode(["test"]), "\n>"], "> test\n>");
+		AssertEquals(">test", [new MfmQuoteNode(["test".ToMfm()])], "> test");
+		AssertEquals("> test", [new MfmQuoteNode(["test".ToMfm()])]);
+		AssertEquals("> test\n> test", [new MfmQuoteNode(["test".ToMfm(), "\n".ToMfm(), "test".ToMfm()])]);
+		AssertEquals(">test\n>\n>test",
+		             [
+			             new MfmQuoteNode([
+				             "test".ToMfm(), //
+				             "\n".ToMfm(),
+				             "\n".ToMfm(),
+				             "test".ToMfm()
+			             ])
+		             ],
+		             "> test\n> \n> test");
+		AssertEquals(">\n>test", [">\n".ToMfm(), new MfmQuoteNode(["test".ToMfm()])], ">\n> test");
+		AssertEquals(">test\n>", [new MfmQuoteNode(["test".ToMfm()]), "\n>".ToMfm()], "> test\n>");
 	}
 
 	[TestMethod]
@@ -588,25 +651,25 @@ public class MfmTests
 			""";
 
 		// @formatter:off
-		List<MfmNode> expected =
+		List<IMfmNode> expected =
 		[
-			"this is plain text > this is not a quote >this is also not a quote\n",
+			"this is plain text > this is not a quote >this is also not a quote\n".ToMfm(),
 			new MfmQuoteNode([
-				"this is a quote",
-				"\n",
-				"this is part of the same quote",
-				"\n",
-				"this too"
+				"this is a quote".ToMfm(),
+				"\n".ToMfm(),
+				"this is part of the same quote".ToMfm(),
+				"\n".ToMfm(),
+				"this too".ToMfm()
 			]),
-			"\n\nthis is some plain text inbetween\n",
+			"\n\nthis is some plain text inbetween\n".ToMfm(),
 			new MfmQuoteNode([
-				"this is a second quote",
-				"\n",
-				"this is part of the second quote"
+				"this is a second quote".ToMfm(),
+				"\n".ToMfm(),
+				"this is part of the second quote".ToMfm()
 			]),
-			"\n\n",
-			new MfmQuoteNode(["this is a third quote"]),
-			"\nand this is some plain text to close it off"
+			"\n\n".ToMfm(),
+			new MfmQuoteNode(["this is a third quote".ToMfm()]),
+			"\nand this is some plain text to close it off".ToMfm()
 		];
 		// @formatter:on
 
@@ -618,29 +681,68 @@ public class MfmTests
 	{
 		// regular nestquote
 		AssertEquals(">test\n>>test\n>test",
-		             [new MfmQuoteNode(["test", new MfmQuoteNode(["test"], true), "test"])], "> test\n>> test\n> test");
+		             [
+			             new MfmQuoteNode([
+				             "test".ToMfm(),
+				             new MfmQuoteNode([
+					             "test".ToMfm() //
+				             ]),
+				             "test".ToMfm()
+			             ])
+		             ],
+		             "> test\n>> test\n> test");
 
 		// depth > 0
-		AssertEquals(">>test", [new MfmQuoteNode([new MfmQuoteNode(["test"], true)])], ">> test");
+		AssertEquals(">>test", [
+			             new MfmQuoteNode([
+				             new MfmQuoteNode([
+					             "test".ToMfm() //
+				             ], true)
+			             ])
+		             ],
+		             ">> test");
 
 		// first line with depth > 0
-		AssertEquals(">>test\n>test", [new MfmQuoteNode([new MfmQuoteNode(["test"], true), "test"])],
+		AssertEquals(">>test\n>test",
+		             [
+			             new MfmQuoteNode([
+				             new MfmQuoteNode([
+					             "test".ToMfm() //
+				             ], true),
+				             "test".ToMfm()
+			             ])
+		             ],
 		             ">> test\n> test");
 
 		// only lines with depth > 0
-		AssertEquals(">>test\n>>test", [new MfmQuoteNode([new MfmQuoteNode(["test", "\n", "test"])])],
+		AssertEquals(">>test\n>>test",
+		             [
+			             new MfmQuoteNode(
+			             [
+				             new MfmQuoteNode(
+				             [
+					             "test".ToMfm(), //
+					             "\n".ToMfm(),
+					             "test".ToMfm()
+				             ])
+			             ])
+		             ],
 		             ">> test\n>> test");
 
 		// nesting limit - should be accepted
 		AssertEquals(">>>>>test",
 		[
-			new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode(["test"])])])])])
+			new MfmQuoteNode([
+				new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode(["test".ToMfm()])])])])
+			])
 		], ">>>>> test");
 
 		// nesting limit - should be rejected
 		AssertEquals(">>>>>>test",
 		[
-			new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([">test"])])])])])
+			new MfmQuoteNode([
+				new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode([">test".ToMfm()])])])])
+			])
 		]);
 
 		// nesting limit - should be rejected
@@ -648,17 +750,17 @@ public class MfmTests
 		AssertEquals(">test\n>>test\n>>>test\n>>>>test\n>>>>>test\n>>>>>>test",
 		[
 			new MfmQuoteNode([
-				"test",
+				"test".ToMfm(),
 				new MfmQuoteNode([
-					"test",
+					"test".ToMfm(),
 					new MfmQuoteNode([
-						"test",
+						"test".ToMfm(),
 						new MfmQuoteNode([
-							"test",
+							"test".ToMfm(),
 							new MfmQuoteNode([
-								"test",
-								"\n",
-								">test"
+								"test".ToMfm(),
+								"\n".ToMfm(),
+								">test".ToMfm()
 							])
 						])
 					])
@@ -673,27 +775,27 @@ public class MfmTests
 		AssertEquals(">test\n>>test\n>>>test\n>>>>test\n>>>>>test\n>>>>>>test\n>>>>>test\n>>>>test\n>>>test\n>>test\n>test",
 		[
 			new MfmQuoteNode([
-				"test",
+				"test".ToMfm(),
 				new MfmQuoteNode([
-					"test",
+					"test".ToMfm(),
 					new MfmQuoteNode([
-						"test",
+						"test".ToMfm(),
 						new MfmQuoteNode([
-							"test",
+							"test".ToMfm(),
 							new MfmQuoteNode([
-								"test",
-								"\n",
-								">test",
-								"\n",
-								"test"
+								"test".ToMfm(),
+								"\n".ToMfm(),
+								">test".ToMfm(),
+								"\n".ToMfm(),
+								"test".ToMfm()
 							]),
-							"test"
+							"test".ToMfm()
 						]),
-						"test"
+						"test".ToMfm()
 					]),
-					"test"
+					"test".ToMfm()
 				]),
-				"test"
+				"test".ToMfm()
 			])
 		],
 		"> test\n>> test\n>>> test\n>>>> test\n>>>>> test\n>>>>>>test\n>>>>> test\n>>>> test\n>>> test\n>> test\n> test");
@@ -701,28 +803,84 @@ public class MfmTests
 
 		// gaps in nesting sequence
 		AssertEquals(">test\n>>>test\n>test",
-		             [new MfmQuoteNode(["test", new MfmQuoteNode([new MfmQuoteNode(["test"])]), "test"])],
+		             [
+			             new MfmQuoteNode(
+			             [
+				             "test".ToMfm(),
+				             new MfmQuoteNode(
+				             [
+					             new MfmQuoteNode(
+					             [ //
+						             "test".ToMfm()
+					             ])
+				             ]),
+				             "test".ToMfm()
+			             ])
+		             ],
 		             "> test\n>>> test\n> test");
 
 		// more gaps
 		AssertEquals(">test\n>>>test\n>>>>>test\n>>>test\n>test",
 		[
-			new MfmQuoteNode([
-				"test",
-				new MfmQuoteNode([new MfmQuoteNode(["test", new MfmQuoteNode([new MfmQuoteNode(["test"])]), "test"])]),
-				"test"
+			new MfmQuoteNode(
+			[ //
+				"test".ToMfm(),
+				new MfmQuoteNode(
+				[ //
+					new MfmQuoteNode(
+					[ //
+						"test".ToMfm(),
+						new MfmQuoteNode(
+						[ //
+							new MfmQuoteNode(
+							[ //
+								"test".ToMfm()
+							])
+						]),
+						"test".ToMfm()
+					])
+				]),
+				"test".ToMfm()
 			])
 		], "> test\n>>> test\n>>>>> test\n>>> test\n> test");
 
 		// gap at start
 		AssertEquals(">>>test\n>test",
-		             [new MfmQuoteNode([new MfmQuoteNode([new MfmQuoteNode(["test"])]), "test"])], ">>> test\n> test");
+		             [ //
+			             new MfmQuoteNode(
+			             [ //
+				             new MfmQuoteNode(
+				             [ //
+					             new MfmQuoteNode(
+					             [ //
+						             "test".ToMfm()
+					             ])
+				             ]),
+				             "test".ToMfm()
+			             ])
+		             ],
+		             ">>> test\n> test");
 
 		// gaps at start and end
 		AssertEquals(">>>test\n>test\n>>>test",
 		[
-			new MfmQuoteNode([
-				new MfmQuoteNode([new MfmQuoteNode(["test"])]), "test", new MfmQuoteNode([new MfmQuoteNode(["test"])])
+			new MfmQuoteNode(
+			[ //
+				new MfmQuoteNode(
+				[ //
+					new MfmQuoteNode(
+					[ //
+						"test".ToMfm()
+					])
+				]),
+				"test".ToMfm(),
+				new MfmQuoteNode(
+				[ //
+					new MfmQuoteNode(
+					[ //
+						"test".ToMfm()
+					])
+				])
 			])
 		], ">>> test\n> test\n>>> test");
 	}
@@ -731,76 +889,85 @@ public class MfmTests
 	public void TestParseFn()
 	{
 		// General fn handling
-		AssertEquals("$[test test]", [new MfmFnNode("test", null, ["test"])]);
-		AssertEquals("$[test123 test]", [new MfmFnNode("test123", null, ["test"])]);
-		AssertEquals("$[test.a test]",
-		             [new MfmFnNode("test", new() { ["a"] = null }, ["test"])]);
-		AssertEquals("$[test.a=b test]",
-		             [new MfmFnNode("test", new() { ["a"] = "b" }, ["test"])]);
+		AssertEquals("$[test test]", [new MfmFnNode("test", null, ["test".ToMfm()])]);
+		AssertEquals("$[test123 test]", [new MfmFnNode("test123", null, ["test".ToMfm()])]);
+		AssertEquals("$[test.a test]", [new MfmFnNode("test", new() { ["a"]   = null }, ["test".ToMfm()])]);
+		AssertEquals("$[test.a=b test]", [new MfmFnNode("test", new() { ["a"] = "b" }, ["test".ToMfm()])]);
 		AssertEquals("$[test.a=b,c=e test]",
-		             [new MfmFnNode("test", new() { ["a"] = "b", ["c"] = "e" }, ["test"])]);
+		[ //
+			new MfmFnNode("test", new() { ["a"] = "b", ["c"] = "e" }, ["test".ToMfm()])
+		]);
 		AssertEquals("$[test.a,c=e test]",
-		             [new MfmFnNode("test", new() { ["a"] = null, ["c"] = "e" }, ["test"])]);
+		[ //
+			new MfmFnNode("test", new() { ["a"] = null, ["c"] = "e" }, ["test".ToMfm()])
+		]);
 		AssertEquals("$[test.a=b,c test]",
-		             [new MfmFnNode("test", new() { ["a"] = "b", ["c"] = null }, ["test"])]);
+		[ //
+			new MfmFnNode("test", new() { ["a"] = "b", ["c"] = null }, ["test".ToMfm()])
+		]);
 
 		// False positives
-		AssertEquals("$", ["$"]);
-		AssertEquals("$[]", ["$[]"]);
-		AssertEquals("$[test]", ["$[test]"]);
-		AssertEquals("$[test ]", ["$[test ]"]);
+		AssertEquals("$", ["$".ToMfm()]);
+		AssertEquals("$[]", ["$[]".ToMfm()]);
+		AssertEquals("$[test]", ["$[test]".ToMfm()]);
+		AssertEquals("$[test ]", ["$[test ]".ToMfm()]);
 
 		// invalid dot
-		AssertEquals("$[.test test]", ["$[.test test]"]);
-		AssertEquals("$[test. test]", ["$[test. test]"]);
-		AssertEquals("$[test.a. test]", ["$[test.a. test]"]);
-		AssertEquals("$[test.a.a test]", ["$[test.a.a test]"]);
+		AssertEquals("$[.test test]", ["$[.test test]".ToMfm()]);
+		AssertEquals("$[test. test]", ["$[test. test]".ToMfm()]);
+		AssertEquals("$[test.a. test]", ["$[test.a. test]".ToMfm()]);
+		AssertEquals("$[test.a.a test]", ["$[test.a.a test]".ToMfm()]);
 
 		// invalid comma
-		AssertEquals("$[,test test]", ["$[,test test]"]);
-		AssertEquals("$[test, test]", ["$[test, test]"]);
+		AssertEquals("$[,test test]", ["$[,test test]".ToMfm()]);
+		AssertEquals("$[test, test]", ["$[test, test]".ToMfm()]);
 
 		// invalid equals
-		AssertEquals("$[=test test]", ["$[=test test]"]);
-		AssertEquals("$[test= test]", ["$[test= test]"]);
-		AssertEquals("$[test=a test]", ["$[test=a test]"]);
-		AssertEquals("$[test.a= test]", ["$[test.a= test]"]);
-		AssertEquals("$[test.a=b= test]", ["$[test.a=b= test]"]);
-		AssertEquals("$[test.a=b=c test]", ["$[test.a=b=c test]"]);
+		AssertEquals("$[=test test]", ["$[=test test]".ToMfm()]);
+		AssertEquals("$[test= test]", ["$[test= test]".ToMfm()]);
+		AssertEquals("$[test=a test]", ["$[test=a test]".ToMfm()]);
+		AssertEquals("$[test.a= test]", ["$[test.a= test]".ToMfm()]);
+		AssertEquals("$[test.a=b= test]", ["$[test.a=b= test]".ToMfm()]);
+		AssertEquals("$[test.a=b=c test]", ["$[test.a=b=c test]".ToMfm()]);
 
 		// Whitespace handling
-		AssertEquals("test $[test test] test", ["test ", new MfmFnNode("test", null, ["test"]), " test"]);
-		AssertEquals("test $[test test]", ["test ", new MfmFnNode("test", null, ["test"])]);
-		AssertEquals("$[test test] test", [new MfmFnNode("test", null, ["test"]), " test"]);
+		AssertEquals("test $[test test] test",
+		[ //
+			"test ".ToMfm(), new MfmFnNode("test", null, ["test".ToMfm()]), " test".ToMfm()
+		]);
+		AssertEquals("test $[test test]", ["test ".ToMfm(), new MfmFnNode("test", null, ["test".ToMfm()])]);
+		AssertEquals("$[test test] test", [new MfmFnNode("test", null, ["test".ToMfm()]), " test".ToMfm()]);
 
 		// Newline handling
-		AssertEquals("$[test te\nst]", [new MfmFnNode("test", null, ["te\nst"])]);
-		AssertEquals("$[test\n test]", ["$[test\n test]"]);
-		AssertEquals("$[test.\na=b test]", ["$[test.\na=b test]"]);
-		AssertEquals("$[test.a\n=b test]", ["$[test.a\n=b test]"]);
-		AssertEquals("$[test.a=\nb test]", ["$[test.a=\nb test]"]);
-		AssertEquals("$[test.a=b\n test]", ["$[test.a=b\n test]"]);
-		AssertEquals("$[test.a=b \ntest]", [new MfmFnNode("test", new() { ["a"] = "b" }, ["\n test"])]);
+		AssertEquals("$[test te\nst]", [new MfmFnNode("test", null, ["te\nst".ToMfm()])]);
+		AssertEquals("$[test\n test]", ["$[test\n test]".ToMfm()]);
+		AssertEquals("$[test.\na=b test]", ["$[test.\na=b test]".ToMfm()]);
+		AssertEquals("$[test.a\n=b test]", ["$[test.a\n=b test]".ToMfm()]);
+		AssertEquals("$[test.a=\nb test]", ["$[test.a=\nb test]".ToMfm()]);
+		AssertEquals("$[test.a=b\n test]", ["$[test.a=b\n test]".ToMfm()]);
+		AssertEquals("$[test.a=b \ntest]", [new MfmFnNode("test", new() { ["a"] = "b" }, ["\n test".ToMfm()])]);
 
 		// Nesting
 		AssertEquals("$[test1 $[test2 inner]]",
-		             [new MfmFnNode("test1", null, [new MfmFnNode("test2", null, ["inner"])])]);
+		[ //
+			new MfmFnNode("test1", null, [new MfmFnNode("test2", null, ["inner".ToMfm()])])
+		]);
 		AssertEquals("$[test1 $[test2 $[test3 inner]]]",
 		[
 			new MfmFnNode("test1", null,
 			[ //
 				new MfmFnNode("test2", null,
 				[ //
-					new MfmFnNode("test3", null, ["inner"])
+					new MfmFnNode("test3", null, ["inner".ToMfm()])
 				])
 			])
 		]);
-
-		AssertEquals("$[scale.x=10,y=10 $[scale.x=10,y=110 $[scale.x=10,y=10 hi]]]", [
+		AssertEquals("$[scale.x=10,y=10 $[scale.x=10,y=110 $[scale.x=10,y=10 hi]]]",
+		[
 			new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" },
 			[
 				new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "110" },
-				              [new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" }, ["hi"])])
+				              [new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" }, ["hi".ToMfm()])])
 			])
 		]);
 
@@ -830,25 +997,25 @@ public class MfmTests
 					             [
 						             new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" },
 						             [ //
-							             "\u2b1b"
+							             "\u2b1b".ToMfm()
 						             ])
 					             ])
 				             ]),
-				             "\n",
+				             "\n".ToMfm(),
 				             new MfmFnNode("position", new() { ["y"] = "9" },
 				             [
 					             new MfmTextNode($":neocat:{new string(' ', 50)}:neocat_aww:")
 				             ]),
-				             "\n",
+				             "\n".ToMfm(),
 				             new MfmFnNode("position", new() { ["y"] = "4.3" },
 				             [
 					             new MfmFnNode("border", new() { ["radius"] = "20" },
 					             [ //
 						             new MfmTextNode(new string(' ', 71))
 					             ]),
-					             "\n"
+					             "\n".ToMfm()
 				             ]),
-				             "\n",
+				             "\n".ToMfm(),
 				             // @formatter:off
 				             new MfmFnNode("followmouse", new() { ["x"] = null },
 				             [
@@ -856,17 +1023,17 @@ public class MfmTests
 					             [
 						             new MfmFnNode("scale", new() { ["x"] = "5", ["y"] = "5" },
 						             [
-							             " ",
+							             " ".ToMfm(),
 							             new MfmFnNode("scale", new() { ["x"] = "0.5", ["y"] = "0.5" },
 							             [
-								             " \n\u26aa",
+								             " \n\u26aa".ToMfm(),
 								             new MfmFnNode("position", new() { ["x"] = "-16.5" },
 								             [
 									             new MfmFnNode("scale", new() { ["x"] = "10" },
 									             [
 										             new MfmFnNode("scale", new() { ["x"] = "10" },
 										             [
-											             "\u2b1b⚪"
+											             "\u2b1b⚪".ToMfm()
 										             ])										             
 									             ])
 								             ]),
@@ -876,17 +1043,17 @@ public class MfmTests
 									             [
 										             new MfmFnNode("scale", new() { ["x"] = "10" },
 										             [
-											             "\u2b1b"
+											             "\u2b1b".ToMfm()
 										             ])
 									             ])
 								             ])
 							             ])
 						             ])
 					             ]),
-					             "\n"
+					             "\n".ToMfm()
 				             ]),
 				             // @formatter:on
-				             "\n\n\n",
+				             "\n\n\n".ToMfm(),
 				             new MfmFnNode("position", new() { ["x"] = "-88" },
 				             [
 					             new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" },
@@ -895,12 +1062,12 @@ public class MfmTests
 						             [
 							             new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" },
 							             [ //
-								             "\u2b1b"
+								             "\u2b1b".ToMfm()
 							             ])
 						             ])
 					             ])
 				             ]),
-				             "\n",
+				             "\n".ToMfm(),
 				             new MfmFnNode("position", new() { ["x"] = "88" },
 				             [
 					             new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" },
@@ -909,15 +1076,15 @@ public class MfmTests
 						             [
 							             new MfmFnNode("scale", new() { ["x"] = "10", ["y"] = "10" },
 							             [ //
-								             "\u2b1b"
+								             "\u2b1b".ToMfm()
 							             ])
 						             ])
 					             ])
 				             ]),
-				             "\n\n",
+				             "\n\n".ToMfm(),
 				             new MfmFnNode("position", new() { ["y"] = "-10" },
 				             [ //
-					             "Neocat Awwww Slider"
+					             "Neocat Awwww Slider".ToMfm()
 				             ])
 			             ])
 		             ]);
@@ -943,7 +1110,7 @@ public class MfmTests
 			return sb.ToString();
 		}
 
-		MfmInlineNode GetExpected(int count, int remaining = limit)
+		IMfmInlineNode GetExpected(int count, int remaining = limit)
 		{
 			if (remaining <= 0)
 				return new MfmTextNode(GetMfm(count));

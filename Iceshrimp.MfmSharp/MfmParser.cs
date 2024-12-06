@@ -10,9 +10,9 @@ public static class MfmParser
 	private const int RecursionLimit  = 20;
 	private const int LookupThreshold = 500;
 
-	public static List<MfmNode> Parse(ReadOnlySpan<char> input) => Parse(input, false);
+	public static List<IMfmNode> Parse(ReadOnlySpan<char> input) => Parse(input, false);
 
-	public static List<MfmNode> Parse(ReadOnlySpan<char> input, bool simple)
+	public static List<IMfmNode> Parse(ReadOnlySpan<char> input, bool simple)
 	{
 		input = input.Trim();
 		if (input.Length == 0) return [];
@@ -23,13 +23,13 @@ public static class MfmParser
 		#if !DEBUG && !FUZZ
 		try
 		{
-		#endif
-		var    state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
-		Parser func  = simple ? ParseNodeSimple : ParseNode;
-		while (!state.IsEos)
-			func(ref state);
-		return state.GetResults();
-		#if !DEBUG && !FUZZ
+			#endif
+			var    state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
+			Parser func  = simple ? ParseNodeSimple : ParseNode;
+			while (!state.IsEos)
+				func(ref state);
+			return state.GetResults();
+			#if !DEBUG && !FUZZ
 		}
 		catch
 		{
@@ -54,7 +54,7 @@ public static class MfmParser
 	{
 		// Basic private state
 		private readonly ReadOnlySpan<char> _stream      = input;
-		private readonly List<MfmNode>      _results     = [];
+		private readonly List<IMfmNode>     _results     = [];
 		private          bool               _closed      = false;
 		private          int                _position    = 0;
 		private          Range?             _pendingText = null;
@@ -108,7 +108,7 @@ public static class MfmParser
 		public void SeekToEnd() => _position = Length;
 
 		// Recursion helper method
-		public MfmInlineNode[] Recurse(int end)
+		public IMfmInlineNode[] Recurse(int end)
 		{
 			if (Mode is ParseMode.Simple)
 				throw new InvalidOperationException("Cannot recurse in simple mode");
@@ -122,7 +122,7 @@ public static class MfmParser
 			while (!state.IsEos)
 				ParseNode(ref state);
 
-			return state.GetResults().Cast<MfmInlineNode>().ToArray();
+			return state.GetResults().Cast<IMfmInlineNode>().ToArray();
 		}
 
 		// Pending text methods
@@ -187,13 +187,13 @@ public static class MfmParser
 		}
 
 		// Result methods
-		public void AddResult(MfmNode node)
+		public void AddResult(IMfmNode node)
 		{
 			MaterializePendingText();
 			_results.Add(node);
 		}
 
-		public List<MfmNode> GetResults()
+		public List<IMfmNode> GetResults()
 		{
 			if (_closed) throw new InvalidOperationException("This ParserState struct has already been closed.");
 			_closed = true;
@@ -917,8 +917,8 @@ public static class MfmParser
 			end = state.Length;
 
 		// @formatter:off
-		List<MfmInlineNode> results = [];
-		Stack<(int depth, List<MfmInlineNode> results)> stack = [];
+		List<IMfmInlineNode> results = [];
+		Stack<(int depth, List<IMfmInlineNode> results)> stack = [];
 		// @formatter:on
 
 		while (end != -1)
@@ -972,21 +972,21 @@ public static class MfmParser
 					while (stack.TryPeek(out var head) && head.depth >= depth)
 					{
 						stack.Pop();
-						var nestQuote = new MfmQuoteNode(results.ToArray(), nested: true);
+						var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
 						while (--currentDepth > head.depth)
-							nestQuote = new MfmQuoteNode([nestQuote], nested: true);
+							nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
 						results = head.results;
 						head.results.Add(nestQuote);
 					}
 
 					if (currentDepth > depth)
 					{
-						var nestQuote = new MfmQuoteNode(results.ToArray(), nested: true);
+						var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
 						results = [nestQuote];
 
 						while (--currentDepth > depth)
 						{
-							nestQuote = new MfmQuoteNode([nestQuote], nested: true);
+							nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
 							results   = [nestQuote];
 						}
 					}
@@ -1003,15 +1003,15 @@ public static class MfmParser
 
 		while (stack.TryPop(out var head))
 		{
-			var nestQuote = new MfmQuoteNode(results.ToArray(), nested: true);
+			var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
 			while (--currentDepth > head.depth)
-				nestQuote = new MfmQuoteNode([nestQuote], nested: true);
+				nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
 			results = head.results;
 			head.results.Add(nestQuote);
 		}
 
 		while (currentDepth-- > 0)
-			results = [new MfmQuoteNode(results.ToArray(), nested: true)];
+			results = [new MfmQuoteNode(results.ToArray(), Nested: true)];
 
 		state.AddResult(new MfmQuoteNode(results.ToArray()));
 
