@@ -10,4 +10,8 @@
       <ProjectReference Include="..\Iceshrimp.MfmSharp\Iceshrimp.MfmSharp.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Remove="results\**" />
+    </ItemGroup>
+
 </Project>

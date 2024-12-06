@@ -15,7 +15,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="TestCases\" />
+      <None Remove="findings*\**" />
+      <None Remove="inputs*\**" />
     </ItemGroup>
 
 </Project>

@@ -18,7 +18,7 @@ public static class ValidateFixes
 		var files = directories.SelectMany(Directory.EnumerateFiles).ToArray();
 
 		var total = files.Length;
-		var opts  = new ParallelOptions { MaxDegreeOfParallelism = 8 };
+		var opts  = new ParallelOptions { MaxDegreeOfParallelism = 4 };
 		var i     = 0;
 		var start = Stopwatch.GetTimestamp();
 
@@ -37,14 +37,36 @@ public static class ValidateFixes
 				return;
 			}
 
-			if (Stopwatch.GetElapsedTime(pre).TotalMilliseconds > 50)
+			if (Stopwatch.GetElapsedTime(pre).TotalMilliseconds > 25)
 				Slow.Add(file);
 			else
 				Pass.Add(file);
 		});
-		var elapsed = Math.Round(Stopwatch.GetElapsedTime(start).TotalSeconds, 2);
 
-		Console.WriteLine($"\rProcessed {total} payloads in {elapsed} seconds.");
+		var slow = Slow.ToList();
+		Slow.Clear();
+		i = 0;
+		foreach (var file in slow.ToArray())
+		{
+			Console.Write($"\rAuditing slow payload {++i}/{slow.Count} ({Slow.Count} still slow)");
+			var  input = File.ReadAllText(file);
+			long pre   = 0;
+			for (var j = 0; j < 5; j++)
+			{
+				pre = Stopwatch.GetTimestamp();
+				MfmParser.Parse(input);
+				if ((Stopwatch.GetElapsedTime(pre) / 5).TotalMilliseconds <= 25)
+					break;
+			}
+
+			if ((Stopwatch.GetElapsedTime(pre) / 5).TotalMilliseconds > 25)
+				Slow.Add(file);
+			else
+				Pass.Add(file);
+		}
+
+		var elapsed = Math.Round(Stopwatch.GetElapsedTime(start).TotalSeconds, 2);
+		Console.WriteLine($"\rProcessed {total} payloads in {elapsed} seconds.        ");
 		Console.WriteLine($"Fail: {Fail.Count}");
 		Console.WriteLine($"Slow: {Slow.Count}");
 		Console.WriteLine($"Pass: {Pass.Count}");
