@@ -3,9 +3,6 @@ using JetBrains.Annotations;
 
 namespace Iceshrimp.MfmSharp;
 
-using Parser = Func<MfmParser.ParserState, MfmParser.ParserState>;
-using Accumulator = Func<MfmParser.ParserState, int, MfmParser.ParserState>;
-
 [PublicAPI]
 public static class MfmParser
 {
@@ -27,9 +24,10 @@ public static class MfmParser
 		try
 		{
 		#endif
-		var state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
+		var    state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
+		Parser func  = simple ? ParseNodeSimple : ParseNode;
 		while (!state.IsEos)
-			state = simple ? ParseNodeSimple(state) : ParseNode(state);
+			func(ref state);
 		return state.GetResults();
 		#if !DEBUG && !FUZZ
 		}
@@ -46,6 +44,10 @@ public static class MfmParser
 		Inline,
 		Simple
 	}
+
+	internal delegate void Parser(ref ParserState arg);
+
+	internal delegate void Accumulator(ref ParserState arg, int endIdx);
 
 	[PublicAPI]
 	internal ref struct ParserState(ReadOnlySpan<char> input, ParseMode mode = ParseMode.Full, int depth = 0)
@@ -118,7 +120,7 @@ public static class MfmParser
 
 			var state = new ParserState(stream, ParseMode.Inline, depth + 1);
 			while (!state.IsEos)
-				state = ParseNode(state);
+				ParseNode(ref state);
 
 			return state.GetResults().Cast<MfmInlineNode>().ToArray();
 		}
@@ -429,9 +431,9 @@ public static class MfmParser
 		= SearchValues.Create([",,", "==", ",=", "=,"], StringComparison.Ordinal);
 
 	// Main parser
-	private static ParserState ParseNode(ParserState state)
+	private static void ParseNode(ref ParserState state)
 	{
-		if (state.IsEos) return state;
+		if (state.IsEos) return;
 		var position = state.Position;
 
 		Parser? parser = null;
@@ -469,7 +471,7 @@ public static class MfmParser
 			_    => ParseText
 		};
 
-		state = parser(state);
+		parser(ref state);
 
 		if (state.Position == position)
 		{
@@ -479,13 +481,11 @@ public static class MfmParser
 			state.UpdatePendingTextAndSeekToBoundary();
 			#endif
 		}
-
-		return state;
 	}
 
-	private static ParserState ParseNodeSimple(ParserState state)
+	private static void ParseNodeSimple(ref ParserState state)
 	{
-		if (state.IsEos) return state;
+		if (state.IsEos) return;
 		var position = state.Position;
 
 		var parser = state.CurrentChar switch
@@ -495,7 +495,7 @@ public static class MfmParser
 			_                                    => ParseText
 		};
 
-		state = parser(state);
+		parser(ref state);
 
 		if (state.Position == position)
 		{
@@ -505,8 +505,6 @@ public static class MfmParser
 			state.UpdatePendingTextAndSeekToBoundary();
 			#endif
 		}
-
-		return state;
 	}
 
 	private static Parser ParseAsterisk(ParserState state)
@@ -518,13 +516,9 @@ public static class MfmParser
 	private static Parser ParseTilde(ParserState state)
 		=> state.MatchAhead("~~") ? ParseStrikeTilde : ParseText;
 
-	private static ParserState SkipChar(ParserState state)
-	{
-		state.Seek(1);
-		return state;
-	}
+	private static void SkipChar(ref ParserState state) => state.Seek(1);
 
-	private static ParserState ParseText(ParserState state)
+	private static void ParseText(ref ParserState state)
 	{
 		// First, we find out how much text we can parse
 		var endIdx = state.IndexOfAnyBoundaryChar();
@@ -533,12 +527,11 @@ public static class MfmParser
 		if (endIdx == -1)
 		{
 			state.UpdatePendingTextAndSeekToEnd();
-			return state;
+			return;
 		}
 
 		if (state.Position == endIdx) endIdx++;
 		state.UpdatePendingTextAndSeekTo(endIdx);
-		return state;
 	}
 
 	private static Parser ParseInlineTag(ParserState state)
@@ -556,23 +549,19 @@ public static class MfmParser
 		if (state.MatchAhead("<https://") || state.MatchAhead("<http://"))
 			return ParseUrlBrackets;
 
-		return s =>
-		{
-			s.UpdatePendingTextAndSeekToBoundary();
-			return s;
-		};
+		return (ref ParserState s) => s.UpdatePendingTextAndSeekToBoundary();
 	}
 
 	private static Parser ParseTag(ParserState state)
 		=> state.MatchAhead("<center>") ? ParseCenterTag : ParseInlineTag(state);
 
-	private static ParserState ParseHashtag(ParserState state)
+	private static void ParseHashtag(ref ParserState state)
 	{
 		const int delimLength = 1;
 		if (!state.MatchWhitespaceBehind(true) || state.MatchWhitespaceAhead(true))
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
-			return state;
+			return;
 		}
 
 		state.Seek(delimLength);
@@ -580,23 +569,21 @@ public static class MfmParser
 		if (endIdx == state.Position || state.Remaining < 1)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-			return state;
+			return;
 		}
 
 		if (endIdx == -1)
 		{
 			state.AddResult(new MfmHashtagNode(state.ReadToEnd().ToString()));
 			state.SeekToEnd();
-			return state;
+			return;
 		}
 
 		state.AddResult(new MfmHashtagNode(state.ReadTo(endIdx).ToString()));
 		state.SeekTo(endIdx);
-
-		return state;
 	}
 
-	private static ParserState ParseEmojiCode(ParserState state)
+	private static void ParseEmojiCode(ref ParserState state)
 	{
 		const int  delimLength = 1;
 		const char delim       = ':';
@@ -607,17 +594,15 @@ public static class MfmParser
 		if (endIdx == -1 || endIdx == state.Position || state.Slice(endIdx).ContainsAnyExcept(EmojiCodeAllowedChars))
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-			return state;
+			return;
 		}
 
 		state.AddResult(new MfmEmojiCodeNode(state.ReadTo(endIdx).ToString()));
 		state.SeekTo(endIdx);
 		state.Seek(delimLength);
-
-		return state;
 	}
 
-	private static ParserState ParseInlineCode(ParserState state)
+	private static void ParseInlineCode(ref ParserState state)
 	{
 		const int  delimLength = 1;
 		const char delim       = '`';
@@ -628,22 +613,20 @@ public static class MfmParser
 		if (endIdx == -1 || endIdx == state.Position)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-			return state;
+			return;
 		}
 
 		state.AddResult(new MfmInlineCodeNode(state.ReadTo(endIdx).ToString()));
 		state.SeekTo(endIdx);
 		state.Seek(delimLength);
-
-		return state;
 	}
 
-	private static ParserState ParseUrl(ParserState state)
+	private static void ParseUrl(ref ParserState state)
 	{
 		if (!state.MatchAhead("https://") && !state.MatchAhead("http://"))
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
-			return state;
+			return;
 		}
 
 		var end = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars));
@@ -690,11 +673,9 @@ public static class MfmParser
 		{
 			state.UpdatePendingTextAndSeekTo(end);
 		}
-
-		return state;
 	}
 
-	private static ParserState ParseUrlBrackets(ParserState state)
+	private static void ParseUrlBrackets(ref ParserState state)
 	{
 		state.Seek(1);
 
@@ -702,7 +683,7 @@ public static class MfmParser
 		if (end == -1 || state.IndexOf('\n', end) != -1)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(1);
-			return state;
+			return;
 		}
 
 		if (
@@ -718,17 +699,15 @@ public static class MfmParser
 		{
 			state.UpdatePendingTextAndSeekTo(end + 1, 1);
 		}
-
-		return state;
 	}
 
-	private static ParserState ParseLink(ParserState state)
+	private static void ParseLink(ref ParserState state)
 	{
 		var silent = state.MatchAhead('?');
 		if (silent && !state.MatchAhead("?["))
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
-			return state;
+			return;
 		}
 
 		var delimLength = silent ? 2 : 1;
@@ -744,7 +723,7 @@ public static class MfmParser
 		)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-			return state;
+			return;
 		}
 
 		var linkStart = textEnd + 2;
@@ -757,7 +736,7 @@ public static class MfmParser
 		if (closeBracketIdx == -1)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-			return state;
+			return;
 		}
 
 		var openBracketIdx = state.IndexOf('(', linkStart..closeBracketIdx);
@@ -785,7 +764,7 @@ public static class MfmParser
 			if (bracketStack > -1)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-				return state;
+				return;
 			}
 		}
 
@@ -802,16 +781,14 @@ public static class MfmParser
 		{
 			state.UpdatePendingTextAndSeekTo(linkEnd + 1, delimLength);
 		}
-
-		return state;
 	}
 
-	private static ParserState ParseMention(ParserState state)
+	private static void ParseMention(ref ParserState state)
 	{
 		if (!state.MatchWhitespaceBehind(true) && !ParenthesisChars.Contains(state.PrevChar))
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
-			return state;
+			return;
 		}
 
 		state.Seek(1);
@@ -823,7 +800,7 @@ public static class MfmParser
 		if (end - state.Position <= 1)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(1);
-			return state;
+			return;
 		}
 
 		var hostPartIdx = state.IndexOf('@', end);
@@ -851,7 +828,7 @@ public static class MfmParser
 		)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(1);
-			return state;
+			return;
 		}
 
 		var hostSlice = ReadOnlySpan<char>.Empty;
@@ -866,7 +843,7 @@ public static class MfmParser
 			)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(1);
-				return state;
+				return;
 			}
 
 			if (earlyEndIdx != -1)
@@ -884,7 +861,7 @@ public static class MfmParser
 			if (hostSlice.Length > 0 && ("-.".Contains(hostSlice[0]) || !hostSlice.Contains('.')))
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(1);
-				return state;
+				return;
 			}
 		}
 
@@ -892,18 +869,16 @@ public static class MfmParser
 		var host = hostSlice.Length > 0 ? hostSlice.ToString() : null;
 		state.AddResult(new MfmMentionNode(user, host));
 		state.SeekTo(end);
-
-		return state;
 	}
 
-	private static ParserState ParseQuote(ParserState state)
+	private static void ParseQuote(ref ParserState state)
 	{
 		const int quoteRecursionLimit = 4;
 
 		if (state.Remaining < 2 || !state.MatchNewlineBehind(true))
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
-			return state;
+			return;
 		}
 
 		state.Seek(1);
@@ -920,7 +895,7 @@ public static class MfmParser
 		if (state.IsEos)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(lookbehind);
-			return state;
+			return;
 		}
 
 		if (state.CurrentChar == ' ')
@@ -932,7 +907,7 @@ public static class MfmParser
 		if (state.CurrentChar == '\n')
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(lookbehind);
-			return state;
+			return;
 		}
 
 		lookbehind = 0;
@@ -1042,8 +1017,6 @@ public static class MfmParser
 
 		if (lookbehind > 0)
 			state.UpdatePendingTextBehindAndSeekToBoundary(lookbehind);
-
-		return state;
 	}
 
 	private static Parser TryParseFn(ParserState state) => state.MatchAhead("$[") ? ParseFnTag : ParseText;
@@ -1064,7 +1037,7 @@ public static class MfmParser
 	private static Parser ParseCodeBlockOrInlineCode(ParserState state)
 		=> state.IsStart && state.MatchAhead("```") ? ParseCodeBlock : ParseInlineCode;
 
-	private static readonly Accumulator ItalicAccumulator = (state, endIdx) =>
+	private static readonly Accumulator ItalicAccumulator = (ref ParserState state, int endIdx) =>
 	{
 		var type = state.PrevChar switch
 		{
@@ -1074,10 +1047,9 @@ public static class MfmParser
 		};
 
 		state.AddResult(new MfmItalicNode(state.Recurse(endIdx), type));
-		return state;
 	};
 
-	private static readonly Accumulator BoldAccumulator = (state, endIdx) =>
+	private static readonly Accumulator BoldAccumulator = (ref ParserState state, int endIdx) =>
 	{
 		var type = state.PrevChar switch
 		{
@@ -1087,10 +1059,9 @@ public static class MfmParser
 		};
 
 		state.AddResult(new MfmBoldNode(state.Recurse(endIdx), type));
-		return state;
 	};
 
-	private static readonly Accumulator StrikeAccumulator = (state, endIdx) =>
+	private static readonly Accumulator StrikeAccumulator = (ref ParserState state, int endIdx) =>
 	{
 		var type = state.PrevChar switch
 		{
@@ -1099,25 +1070,18 @@ public static class MfmParser
 		};
 
 		state.AddResult(new MfmStrikeNode(state.Recurse(endIdx), type));
-		return state;
 	};
 
-	private static readonly Accumulator InlineMathAccumulator = (state, endIdx) =>
-	{
-		state.AddResult(new MfmInlineMathNode(state.ReadTo(endIdx).ToString()));
-		return state;
-	};
+	private static readonly Accumulator InlineMathAccumulator = (ref ParserState state, int endIdx)
+		=> state.AddResult(new MfmInlineMathNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator MathBlockAccumulator = (state, endIdx) =>
-	{
-		state.AddResult(new MfmMathBlockNode(state.ReadTo(endIdx).ToString()));
-		return state;
-	};
+	private static readonly Accumulator MathBlockAccumulator = (ref ParserState state, int endIdx)
+		=> state.AddResult(new MfmMathBlockNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator CodeBlockAccumulator = (state, endIdx) =>
+	private static readonly Accumulator CodeBlockAccumulator = (ref ParserState state, int endIdx) =>
 	{
 		if (endIdx == state.Position)
-			return state;
+			return;
 
 		string? lang = null;
 		if (state.CurrentChar != '\n')
@@ -1132,10 +1096,9 @@ public static class MfmParser
 
 		state.Seek(1);
 		state.AddResult(new MfmCodeBlockNode(state.ReadTo(endIdx).ToString(), lang));
-		return state;
 	};
 
-	private static readonly Accumulator CenterAccumulator = (state, endIdx) =>
+	private static readonly Accumulator CenterAccumulator = (ref ParserState state, int endIdx) =>
 	{
 		if (state.CurrentChar == '\n' && state.Position < endIdx)
 			state.Seek(1);
@@ -1143,35 +1106,28 @@ public static class MfmParser
 			endIdx--;
 
 		state.AddResult(new MfmCenterNode(state.Recurse(endIdx)));
-		return state;
 	};
 
-	private static readonly Accumulator SmallAccumulator = (state, endIdx) =>
-	{
-		state.AddResult(new MfmSmallNode(state.Recurse(endIdx)));
-		return state;
-	};
+	private static readonly Accumulator SmallAccumulator = (ref ParserState state, int endIdx)
+		=> state.AddResult(new MfmSmallNode(state.Recurse(endIdx)));
 
-	private static readonly Accumulator PlainAccumulator = (state, endIdx) =>
-	{
-		state.AddResult(new MfmPlainNode(state.ReadTo(endIdx).ToString()));
-		return state;
-	};
+	private static readonly Accumulator PlainAccumulator = (ref ParserState state, int endIdx)
+		=> state.AddResult(new MfmPlainNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator FnAccumulator = (state, endIdx) =>
+	private static readonly Accumulator FnAccumulator = (ref ParserState state, int endIdx) =>
 	{
 		var descriptorEndIdx = state.IndexOf(' ', endIdx);
 		if (descriptorEndIdx == -1 || endIdx - descriptorEndIdx <= 1)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(2);
-			return state;
+			return;
 		}
 
 		var nameAndArgs = state.Slice(descriptorEndIdx);
 		if (nameAndArgs.Length == 0 || nameAndArgs.ContainsAnyExcept(FnDescriptorAllowedChars))
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(2);
-			return state;
+			return;
 		}
 
 		var argsIdx = nameAndArgs.IndexOf('.');
@@ -1180,7 +1136,7 @@ public static class MfmParser
 		if (name.Length == 0 || name.ContainsAnyExcept(FnKeyAllowedChars))
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(2);
-			return state;
+			return;
 		}
 
 		Dictionary<string, string?>? args = null;
@@ -1197,7 +1153,7 @@ public static class MfmParser
 			)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(2);
-				return state;
+				return;
 			}
 
 			args = [];
@@ -1212,7 +1168,7 @@ public static class MfmParser
 					if (arg.ContainsAnyExcept(FnKeyAllowedChars))
 					{
 						state.UpdatePendingTextBehindAndSeekToBoundary(2);
-						return state;
+						return;
 					}
 
 					args[arg.ToString()] = null;
@@ -1224,7 +1180,7 @@ public static class MfmParser
 				if (key.ContainsAnyExcept(FnKeyAllowedChars) || value.ContainsAnyExcept(FnArgValueAllowedChars))
 				{
 					state.UpdatePendingTextBehindAndSeekToBoundary(2);
-					return state;
+					return;
 				}
 
 				args[key.ToString()] = value.ToString();
@@ -1236,7 +1192,6 @@ public static class MfmParser
 		state.AddResult(new MfmFnNode(name.ToString(), args, state.Recurse(endIdx)));
 		state.SeekTo(endIdx);
 		state.Seek(1);
-		return state;
 	};
 
 	private static readonly Parser ParseItalicAsterisk   = GetMarkupNode('*', "**", ItalicAccumulator);
@@ -1275,7 +1230,7 @@ public static class MfmParser
 	)
 	{
 		const int delimLength = 1;
-		return state =>
+		return (ref ParserState state) =>
 		{
 			state.Seek(delimLength);
 
@@ -1290,12 +1245,11 @@ public static class MfmParser
 			)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-				return state;
+				return;
 			}
 
-			state = accumulator(state, endIdx);
+			accumulator(ref state, endIdx);
 			state.SeekTo(endIdx + delimLength);
-			return state;
 		};
 	}
 
@@ -1304,7 +1258,7 @@ public static class MfmParser
 	)
 	{
 		var delimLength = delim.Length;
-		return state =>
+		return (ref ParserState state) =>
 		{
 			state.Seek(delimLength);
 
@@ -1321,12 +1275,11 @@ public static class MfmParser
 			)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-				return state;
+				return;
 			}
 
-			state = accumulator(state, endIdx);
+			accumulator(ref state, endIdx);
 			state.SeekTo(endIdx + delimLength);
-			return state;
 		};
 	}
 
@@ -1340,12 +1293,12 @@ public static class MfmParser
 		var closeTagLength = closeTag.Length;
 		var tags           = SearchValues.Create([openTag, closeTag], StringComparison.Ordinal);
 
-		return state =>
+		return (ref ParserState state) =>
 		{
 			if (requireStartOfLine && !state.MatchNewlineBehind(true))
 			{
 				state.UpdatePendingTextAndSeekToBoundary();
-				return state;
+				return;
 			}
 
 			var consumedNewlines = 0;
@@ -1414,10 +1367,10 @@ public static class MfmParser
 			if (end == -1)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(openTagLength + consumedNewlines);
-				return state;
+				return;
 			}
 
-			state = accumulator(state, end);
+			accumulator(ref state, end);
 
 			if (seekToEnd)
 				state.SeekTo(end + closeTagLength);
@@ -1430,8 +1383,6 @@ public static class MfmParser
 					state.Seek(1);
 				}
 			}
-
-			return state;
 		};
 	}
 
