@@ -305,6 +305,15 @@ public static class MfmParser
 			return Lookup(ref key) ?? SetLookup(ref key, WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value));
 		}
 
+		public int IndexOfAny(SearchValues<string> sv, string name, Range range)
+		{
+			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
+				return WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value);
+
+			var key = new LookupEntry("IndexOfAny", name, null, range.End.Value, range.Start.Value);
+			return Lookup(ref key) ?? SetLookup(ref key, WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value));
+		}
+
 		public int IndexOfAnyBoundaryChar() => Mode switch
 		{
 			ParseMode.Full   => IndexOfAny(BoundaryCharsFull, nameof(BoundaryCharsFull), skipLookup: true),
@@ -682,9 +691,9 @@ public static class MfmParser
 				var i = -1;
 				while (bracketStack >= 0 && ++i < slice.Length)
 				{
-					var next = slice[i..].IndexOfAny(ParenthesisChars);
-					if (next == -1) break;
-					i += next;
+					i = state.IndexOfAny(ParenthesisChars, nameof(ParenthesisChars), (openBracketIdx + i)..end);
+					if (i == -1) break;
+					i -= openBracketIdx;
 
 					bracketStack += slice[i] == '(' ? 1 : -1;
 					if (bracketStack == -1)
@@ -784,9 +793,9 @@ public static class MfmParser
 			var i = -1;
 			while (bracketStack >= 0 && ++i < slice.Length)
 			{
-				var next = slice[i..].IndexOfAny(ParenthesisChars);
-				if (next == -1) break;
-				i += next;
+				i = state.IndexOfAny(ParenthesisChars, nameof(ParenthesisChars), (openBracketIdx + i)..linkEnd);
+				if (i == -1) break;
+				i -= openBracketIdx;
 
 				bracketStack += slice[i] == '(' ? 1 : -1;
 				if (bracketStack == -1)
@@ -1322,6 +1331,7 @@ public static class MfmParser
 		var openTagLength  = openTag.Length;
 		var closeTagLength = closeTag.Length;
 		var tags           = SearchValues.Create([openTag, closeTag], StringComparison.Ordinal);
+		var name           = $"{openTag}-{closeTag}";
 
 		return (ref ParserState state) =>
 		{
@@ -1368,14 +1378,14 @@ public static class MfmParser
 						var i = -1;
 						while (tagStack >= 0 && ++i < slice.Length)
 						{
-							var next = slice[i..].IndexOfAny(tags);
-							if (next is -1)
+							i = state.IndexOfAny(tags, name, (openTagIdx + i)..searchSpaceEnd);
+							if (i is -1)
 							{
 								end = closeTagIdx;
 								break;
 							}
 
-							i += next;
+							i -= openTagIdx;
 
 							if (openTagLength <= closeTagLength)
 								tagStack += slice[i..(i + openTagLength)].SequenceEqual(openTag) ? 1 : -1;
