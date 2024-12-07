@@ -64,7 +64,7 @@ public static class MfmParser
 		private AutoResizeArray<IMfmInlineNode> _recurseResults = new();
 
 		// Cache for (possibly) expensive lookups
-		private Dictionary<string, int>? _lookup = null;
+		private Dictionary<LookupEntry, int>? _lookup = null;
 
 		// Helper expression-bodied properties
 		public int  Position    => _position;
@@ -265,18 +265,26 @@ public static class MfmParser
 		private static int WithIndex(int offset, int index) => offset is -1 ? -1 : index + offset;
 
 		// Index lookup methods
-		private int? Lookup(string key)
+		private readonly record struct LookupEntry(
+			string Method,
+			string? String = null,
+			char? Char = null,
+			int? End = null,
+			int? Start = null
+		);
+
+		private int? Lookup(ref LookupEntry key)
 			=> (_lookup ??= []).TryGetValue(key, out var val) && (val < 0 || val >= _position) ? val : null;
 
-		private int SetLookup(string key, int val) => (_lookup ??= [])[key] = val;
+		private int SetLookup(ref LookupEntry key, int val) => (_lookup ??= [])[key] = val;
 
 		public int IndexOfAny(SearchValues<char> sv, string name, bool skipLookup = false)
 		{
 			if (_skipLookup || skipLookup || Remaining < LookupThreshold)
 				return WithPosition(_stream[_position..].IndexOfAny(sv));
 
-			var key = $"IndexOfAny-{name}";
-			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..].IndexOfAny(sv)));
+			var key = new LookupEntry("IndexOfAny", name, null, Length);
+			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..].IndexOfAny(sv)));
 		}
 
 		public int IndexOfAny(SearchValues<char> sv, string name, int end)
@@ -284,8 +292,8 @@ public static class MfmParser
 			if (_skipLookup || end - Position < LookupThreshold)
 				return WithPosition(_stream[_position..end].IndexOfAny(sv));
 
-			var key = $"IndexOfAny-{name}-{end}";
-			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..end].IndexOfAny(sv)));
+			var key = new LookupEntry("IndexOfAny", name, null, end);
+			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end].IndexOfAny(sv)));
 		}
 
 		public int IndexOfAny(SearchValues<char> sv, string name, Range range)
@@ -293,8 +301,8 @@ public static class MfmParser
 			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
 				return WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value);
 
-			var key = $"IndexOfAny-{name}-{range.Start}-{range.End}";
-			return Lookup(key) ?? SetLookup(key, WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value));
+			var key = new LookupEntry("IndexOfAny", name, null, range.End.Value, range.Start.Value);
+			return Lookup(ref key) ?? SetLookup(ref key, WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value));
 		}
 
 		public int IndexOfAnyBoundaryChar() => Mode switch
@@ -305,31 +313,32 @@ public static class MfmParser
 			_                => throw new ArgumentOutOfRangeException()
 		};
 
-		public int IndexOf(ReadOnlySpan<char> span, Range range)
+		public int IndexOf(string sequence, string name, Range range)
 		{
 			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
-				return WithIndex(_stream[range].IndexOf(span), range.Start.Value);
+				return WithIndex(_stream[range].IndexOf(sequence), range.Start.Value);
 
-			var key = $"IndexOf-{span}-{range.Start}-{range.End}";
-			return Lookup(key) ?? SetLookup(key, WithIndex(_stream[range].IndexOf(span), range.Start.Value));
+			var key = new LookupEntry("IndexOf", name, null, range.Start.Value, range.End.Value);
+			return Lookup(ref key)
+			       ?? SetLookup(ref key, WithIndex(_stream[range].IndexOf(sequence), range.Start.Value));
 		}
 
-		public int IndexOf(ReadOnlySpan<char> span, int end)
+		public int IndexOf(string sequence, int end)
 		{
 			if (_skipLookup || end - Position < LookupThreshold)
-				return WithPosition(_stream[_position..end].IndexOf(span));
+				return WithPosition(_stream[_position..end].IndexOf(sequence));
 
-			var key = $"IndexOf-{span}-{end}";
-			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..end].IndexOf(span)));
+			var key = new LookupEntry("IndexOf", sequence, null, end);
+			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end].IndexOf(sequence)));
 		}
 
-		public int IndexOf(ReadOnlySpan<char> span)
+		public int IndexOf(string sequence)
 		{
 			if (_skipLookup || Remaining < LookupThreshold)
-				return WithPosition(_stream[_position..].IndexOf(span));
+				return WithPosition(_stream[_position..].IndexOf(sequence));
 
-			var key = $"IndexOf-{span}-{LastIdx}";
-			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..].IndexOf(span)));
+			var key = new LookupEntry("IndexOf", sequence, null, Length);
+			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..].IndexOf(sequence)));
 		}
 
 		public int IndexOf(char c, Range range)
@@ -337,8 +346,8 @@ public static class MfmParser
 			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
 				return WithIndex(_stream[range].IndexOf(c), range.Start.Value);
 
-			var key = $"IndexOf-{c}-{range.Start}-{range.End}";
-			return Lookup(key) ?? SetLookup(key, WithIndex(_stream[range].IndexOf(c), range.Start.Value));
+			var key = new LookupEntry("IndexOf", null, c, range.End.Value, range.Start.Value);
+			return Lookup(ref key) ?? SetLookup(ref key, WithIndex(_stream[range].IndexOf(c), range.Start.Value));
 		}
 
 		public int IndexOf(char c, int? end)
@@ -348,17 +357,17 @@ public static class MfmParser
 			if (_skipLookup || end.Value - Position < LookupThreshold)
 				return WithPosition(_stream[_position..end.Value].IndexOf(c));
 
-			var key = $"IndexOf-{c}-{end}";
-			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..end.Value].IndexOf(c)));
+			var key = new LookupEntry("IndexOf", null, c, end);
+			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end.Value].IndexOf(c)));
 		}
 
-		public int IndexOf(char c)
+		public int IndexOf(char c, bool skipLookup = false)
 		{
-			if (_skipLookup || Remaining < LookupThreshold)
+			if (_skipLookup || skipLookup || Remaining < LookupThreshold)
 				WithPosition(_stream[_position..].IndexOf(c));
 
-			var key = $"IndexOf-{c}-{LastIdx}";
-			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..].IndexOf(c)));
+			var key = new LookupEntry("IndexOf", null, c, Length);
+			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..].IndexOf(c)));
 		}
 
 		public int LastIndexOf(char c, int? end)
@@ -368,8 +377,8 @@ public static class MfmParser
 			if (_skipLookup || end.Value - Position < LookupThreshold)
 				WithPosition(_stream[_position..end.Value].LastIndexOf(c));
 
-			var key = $"IndexOf-{c}-{end}";
-			return Lookup(key) ?? SetLookup(key, WithPosition(_stream[_position..end.Value].LastIndexOf(c)));
+			var key = new LookupEntry("IndexOf", null, c, end);
+			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end.Value].LastIndexOf(c)));
 		}
 
 		public int? IndexOfOrNull(char c) => IndexOf(c) is var idx && idx < 0 ? null : idx;
@@ -379,8 +388,8 @@ public static class MfmParser
 			if (_skipLookup || Position - (end ?? LastIdx) < LookupThreshold)
 				IndexOfExceptInner(match, except, end);
 
-			var key = $"IndexOfExcept-{match}-{except}-{end ?? LastIdx}";
-			return Lookup(key) ?? SetLookup(key, IndexOfExceptInner(match, except, end));
+			var key = new LookupEntry("IndexOfExcept", except, match, end ?? Length);
+			return Lookup(ref key) ?? SetLookup(ref key, IndexOfExceptInner(match, except, end));
 		}
 
 		private int IndexOfExceptInner(char match, ReadOnlySpan<char> except, int? end = null)
@@ -540,8 +549,6 @@ public static class MfmParser
 
 	private static Parser ParseTilde(ParserState state)
 		=> state.MatchAhead("~~") ? ParseStrikeTilde : ParseText;
-
-	private static void SkipChar(ref ParserState state) => state.Seek(1);
 
 	private static void ParseText(ref ParserState state)
 	{
