@@ -7,6 +7,7 @@ using BenchmarkDotNet.Running;
 using Iceshrimp.MfmSharp;
 using Iceshrimp.MfmSharp.Examples;
 using Perfolizer.Horology;
+using Perfolizer.Metrology;
 
 var opts = DefaultConfig
            .Instance
@@ -14,6 +15,7 @@ var opts = DefaultConfig
            .WithSummaryStyle(SummaryStyle
                              .Default
                              .WithTimeUnit(TimeUnit.Microsecond)
+                             .WithSizeUnit(SizeUnit.KB)
                              .WithMaxParameterColumnWidth(100));
 
 BenchmarkRunner.Run<Benchmarks>(opts);
