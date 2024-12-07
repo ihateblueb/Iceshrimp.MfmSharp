@@ -43,6 +43,7 @@ fi
 export AFL_SKIP_BIN_CHECK=1
 
 if [[ "$2" == 'main' ]]; then
+  export AFL_FINAL_SYNC=1
   afl-fuzz -M "$3" -G 100000 -a text -t 1000 -i "$input_dir" -o "$findings_dir" -x mfm.dict "$(which dotnet)" "$output_dir/$project.dll"
 elif [[ "$2" == 'secondary' ]]; then
   afl-fuzz -S "$3" -G 100000 -a text -t 1000 -i "$input_dir" -o "$findings_dir" -x mfm.dict "$(which dotnet)" "$output_dir/$project.dll"
