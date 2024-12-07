@@ -8,7 +8,7 @@ public static class MfmParser
 {
 	private const int LengthLimit     = 100_000;
 	private const int RecursionLimit  = 20;
-	private const int LookupThreshold = 500;
+	private const int LookupThreshold = 2000;
 
 	public static IMfmNode[] Parse(ReadOnlySpan<char> input) => Parse(input, false);
 
@@ -654,7 +654,7 @@ public static class MfmParser
 			return;
 		}
 
-		var end = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars));
+		var end = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars), true);
 
 		if (end == -1)
 			end = state.Length;
