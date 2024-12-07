@@ -18,34 +18,28 @@ var opts = DefaultConfig
 
 BenchmarkRunner.Run<Benchmarks>(opts);
 
-[MemoryDiagnoser]
+[MemoryDiagnoser(false)]
 [ShortRunJob]
-//[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByParams)]
+[HideColumns("Method", "StdDev")]
 public class Benchmarks
 {
-	public static IEnumerable<string> GetPayloads()
+	public static IEnumerable<string> GetPayloadNames()
 		=> typeof(MfmExamples).GetMethods(BindingFlags.Static | BindingFlags.Public)
 		                      .Select(p => p.Name);
 
 	// ReSharper disable once MemberCanBePrivate.Global
-	[ParamsSource(nameof(GetPayloads))] public string Payload { get; set; } = null!;
+	[ParamsSource(nameof(GetPayloadNames))]
+	public string PayloadName { get; set; } = null!;
 
-	[Benchmark(Baseline = true)]
-	public void MfmSharp()
+	private static readonly Dictionary<string, string> PayloadCache = [];
+
+	private string GetPayload(string name)
 	{
-		var input = (string)typeof(MfmExamples).GetMethod(Payload)!.Invoke(null, [])!;
-		_ = MfmParser.Parse(input);
-		//if (res is [MfmNodeTypes.MfmTimeoutTextNode])
-		//	throw new Exception("Test timed out");
+		if (PayloadCache.TryGetValue(name, out var payload)) return payload;
+		PayloadCache[name] = payload = (string)typeof(MfmExamples).GetMethod(PayloadName)!.Invoke(null, [])!;
+		return payload;
 	}
 
-	//[Benchmark]
-	//public void FParsec()
-	//{
-	//	var input = (string)typeof(MfmExamples).GetMethod(Payload)!.Invoke(null, [])!;
-	//	var res   = Mfm.parse(input);
-	//	if (res is [MfmNodeTypes.MfmTimeoutTextNode])
-	//		throw new Exception("Test timed out");
-	//	_ = res.ToList();
-	//}
+	[Benchmark]
+	public void MfmSharp() => _ = MfmParser.Parse(GetPayload(PayloadName));
 }
