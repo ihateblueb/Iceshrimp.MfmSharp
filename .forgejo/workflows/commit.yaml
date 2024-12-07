@@ -1,0 +1,22 @@
+on:
+  push:
+    branches:
+      - 'dev'
+jobs:
+  run-tests:
+    runs-on: docker
+    container:
+      image: iceshrimp.dev/iceshrimp/ci-env:dotnet9
+      options: --volume /opt/iceshrimp-cache/nuget:/root/.nuget
+    steps:
+      - name: Clone repository
+        run: git clone "$REPO" --branch="$BRANCH" --depth=1 .
+        env:
+          REPO: ${{ github.event.repository.clone_url }}
+          BRANCH: ${{ github.ref_name }}
+      - name: Print environment info
+        run: dotnet --info
+      - name: Run unit tests
+        run: |
+          cd Iceshrimp.MfmSharp.Tests
+          dotnet test
