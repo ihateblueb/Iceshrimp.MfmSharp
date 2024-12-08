@@ -930,6 +930,12 @@ public class MfmTests
 		AssertEquals("$[test.a=b= test]", ["$[test.a=b= test]".ToMfm()]);
 		AssertEquals("$[test.a=b=c test]", ["$[test.a=b=c test]".ToMfm()]);
 
+		// url handling
+		AssertEquals("$[media https://test.com/file.webp]",
+		[ //
+			new MfmFnNode("media", null, [new MfmUrlNode("https://test.com/file.webp", false)])
+		]);
+
 		// Whitespace handling
 		AssertEquals("test $[test test] test",
 		[ //
