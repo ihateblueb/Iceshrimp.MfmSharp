@@ -365,7 +365,7 @@ public static class MfmParser
 		public int IndexOf(char c, bool skipLookup = false)
 		{
 			if (_skipLookup || skipLookup || Remaining < LookupThreshold)
-				WithPosition(_stream[_position..].IndexOf(c));
+				return WithPosition(_stream[_position..].IndexOf(c));
 
 			var key = new LookupEntry("IndexOf", null, c, Length);
 			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..].IndexOf(c)));
@@ -376,7 +376,7 @@ public static class MfmParser
 			end ??= Length;
 
 			if (_skipLookup || end.Value - Position < LookupThreshold)
-				WithPosition(_stream[_position..end.Value].LastIndexOf(c));
+				return WithPosition(_stream[_position..end.Value].LastIndexOf(c));
 
 			var key = new LookupEntry("IndexOf", null, c, end);
 			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end.Value].LastIndexOf(c)));
@@ -387,7 +387,7 @@ public static class MfmParser
 		public int IndexOfExcept(char match, string except, int? end = null)
 		{
 			if (_skipLookup || Position - (end ?? LastIdx) < LookupThreshold)
-				IndexOfExceptInner(match, except, end);
+				return IndexOfExceptInner(match, except, end);
 
 			var key = new LookupEntry("IndexOfExcept", except, match, end ?? Length);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfExceptInner(match, except, end));
