@@ -8,7 +8,7 @@ public static class MfmParser
 {
 	private const int LengthLimit     = 100_000;
 	private const int RecursionLimit  = 20;
-	private const int LookupThreshold = 2000;
+	private const int LookupThreshold = 500;
 
 	public static IMfmNode[] Parse(ReadOnlySpan<char> input) => Parse(input, false);
 
@@ -50,12 +50,25 @@ public static class MfmParser
 	internal delegate void Accumulator(ref ParserState arg, int endIdx);
 
 	[PublicAPI]
-	internal ref struct ParserState(ReadOnlySpan<char> input, ParseMode mode = ParseMode.Full, int depth = 0)
+	internal ref struct ParserState(ReadOnlySpan<char> input, ParseMode mode = ParseMode.Full)
 	{
+		// Recurse constructor
+		private ParserState(
+			ReadOnlySpan<char> input, ParseMode mode, int depth, int offset, Dictionary<LookupEntry, int>? lookupCache,
+			HashSet<string>? unmatchedTags
+		) : this(input, mode)
+		{
+			_lookupCache   = lookupCache;
+			_unmatchedTags = unmatchedTags;
+			_depth         = depth;
+			_offset        = _lookupCache is not null ? offset : null;
+		}
+
 		// Basic private state
 		private readonly ReadOnlySpan<char> _stream      = input;
 		private          bool               _closed      = false;
 		private          int                _position    = 0;
+		private          int                _depth       = 0;
 		private          Range?             _pendingText = null;
 		private          bool               _skipLookup  = input.Length < LookupThreshold;
 
@@ -64,12 +77,13 @@ public static class MfmParser
 		private AutoResizeArray<IMfmInlineNode> _recurseResults = new();
 
 		// Cache for (possibly) expensive lookups
-		private Dictionary<LookupEntry, int>? _lookup            = null;
-		private HashSet<string>?              _unmatchedCloseTag = null;
+		private Dictionary<LookupEntry, int>? _lookupCache   = null;
+		private HashSet<string>?              _unmatchedTags = null;
+		private int?                          _offset        = null;
 
 		// Helper expression-bodied properties
 		public int  Position    => _position;
-		public int  Depth       => depth;
+		public int  Depth       => _depth;
 		public int  Length      => _stream.Length;
 		public int  Remaining   => Length - _position;
 		public int  LastIdx     => _stream.Length - 1;
@@ -119,10 +133,11 @@ public static class MfmParser
 
 			var stream = _stream[_position..end];
 			if (stream.Length == 0) return [];
-			if (depth == RecursionLimit || !stream.ContainsAny(BoundaryChars))
+			if (_depth == RecursionLimit || !stream.ContainsAny(BoundaryChars))
 				return [new MfmTextNode(stream.ToString())];
 
-			var state = new ParserState(stream, ParseMode.Inline, depth + 1);
+			var offset = _position + (_offset ?? 0);
+			var state  = new ParserState(stream, ParseMode.Inline, _depth + 1, offset, _lookupCache, _unmatchedTags);
 			while (!state.IsEos)
 				ParseNode(ref state);
 
@@ -186,7 +201,7 @@ public static class MfmParser
 		private void MaterializePendingText()
 		{
 			if (_pendingText is not { } range) return;
-			if (depth == 0)
+			if (_depth == 0)
 				_results.Add(new MfmTextNode(_stream[range].ToString()));
 			else
 				_recurseResults.Add(new MfmTextNode(_stream[range].ToString()));
@@ -197,7 +212,7 @@ public static class MfmParser
 		// Result methods
 		public void AddBlockResult(IMfmBlockNode node)
 		{
-			if (depth != 0) throw new InvalidOperationException("Cannot add block result to recursive state");
+			if (_depth != 0) throw new InvalidOperationException("Cannot add block result to recursive state");
 			MaterializePendingText();
 			_results.Add(node);
 		}
@@ -205,7 +220,7 @@ public static class MfmParser
 		public void AddInlineResult(IMfmInlineNode node)
 		{
 			MaterializePendingText();
-			if (depth == 0)
+			if (_depth == 0)
 				_results.Add(node);
 			else
 				_recurseResults.Add(node);
@@ -275,9 +290,13 @@ public static class MfmParser
 		);
 
 		private int? Lookup(ref LookupEntry key)
-			=> (_lookup ??= []).TryGetValue(key, out var val) && (val < 0 || val >= _position) ? val : null;
+			=> (_lookupCache ??= []).TryGetValue(key, out var val) && val >= _position
+				? val
+				: val < 0
+					? val - (_offset ?? 0)
+					: null;
 
-		private int SetLookup(ref LookupEntry key, int val) => (_lookup ??= [])[key] = val;
+		private int SetLookup(ref LookupEntry key, int val) => (_lookupCache ??= [])[key] = val;
 
 		public int IndexOfAny(SearchValues<char> sv) => WithPosition(_stream[_position..].IndexOfAny(sv));
 
@@ -381,12 +400,12 @@ public static class MfmParser
 		}
 
 		// Closing tag methods
-		public bool HasUnmatchedTag(string tag) => _unmatchedCloseTag?.Contains(tag) ?? false;
+		public bool HasUnmatchedTag(string tag) => _unmatchedTags?.Contains(tag) ?? false;
 
 		public void AddUnmatchedTag(string tag)
 		{
-			if (_skipLookup && _unmatchedCloseTag is null) return;
-			(_unmatchedCloseTag ??= []).Add(tag);
+			if (_skipLookup && _unmatchedTags is null) return;
+			(_unmatchedTags ??= []).Add(tag);
 		}
 	}
 
