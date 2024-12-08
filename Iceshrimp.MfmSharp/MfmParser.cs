@@ -279,121 +279,88 @@ public static class MfmParser
 
 		private int SetLookup(ref LookupEntry key, int val) => (_lookup ??= [])[key] = val;
 
-		public int IndexOfAny(SearchValues<char> sv, string name, bool skipLookup = false)
+		public int IndexOfAny(SearchValues<char> sv) => WithPosition(_stream[_position..].IndexOfAny(sv));
+
+		public int IndexOfAnyCached(SearchValues<char> sv, string name)
 		{
-			if (_skipLookup || skipLookup || Remaining < LookupThreshold)
-				return WithPosition(_stream[_position..].IndexOfAny(sv));
+			if (_skipLookup || Remaining < LookupThreshold)
+				return IndexOfAny(sv);
 
 			var key = new LookupEntry("IndexOfAny", name, null, Length);
-			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..].IndexOfAny(sv)));
+			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv));
 		}
 
-		public int IndexOfAny(SearchValues<char> sv, string name, int end)
+		public int IndexOfAny(SearchValues<char> sv, int end) => WithPosition(_stream[_position..end].IndexOfAny(sv));
+
+		public int IndexOfAnyCached(SearchValues<char> sv, string name, int end)
 		{
 			if (_skipLookup || end - Position < LookupThreshold)
-				return WithPosition(_stream[_position..end].IndexOfAny(sv));
+				return IndexOfAny(sv, end);
 
 			var key = new LookupEntry("IndexOfAny", name, null, end);
-			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end].IndexOfAny(sv)));
+			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv, end));
 		}
 
-		public int IndexOfAny(SearchValues<char> sv, string name, Range range)
+		public int IndexOfAny(SearchValues<char> sv, Range range)
+			=> WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value);
+
+		public int IndexOfAnyCached(SearchValues<char> sv, string name, Range range)
 		{
 			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
-				return WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value);
+				return IndexOfAny(sv, range);
 
 			var key = new LookupEntry("IndexOfAny", name, null, range.End.Value, range.Start.Value);
-			return Lookup(ref key) ?? SetLookup(ref key, WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value));
+			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv, range));
 		}
 
 		public int IndexOfAnyBoundaryChar() => Mode switch
 		{
-			ParseMode.Full   => IndexOfAny(BoundaryCharsFull, nameof(BoundaryCharsFull), skipLookup: true),
-			ParseMode.Inline => IndexOfAny(BoundaryCharsInline, nameof(BoundaryCharsInline), skipLookup: true),
-			ParseMode.Simple => IndexOfAny(BoundaryCharsSimple, nameof(BoundaryCharsSimple), skipLookup: true),
+			ParseMode.Full   => IndexOfAny(BoundaryCharsFull),
+			ParseMode.Inline => IndexOfAny(BoundaryCharsInline),
+			ParseMode.Simple => IndexOfAny(BoundaryCharsSimple),
 			_                => throw new ArgumentOutOfRangeException()
 		};
 
-		public int IndexOf(string sequence, string name, Range range)
-		{
-			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
-				return WithIndex(_stream[range].IndexOf(sequence), range.Start.Value);
-
-			var key = new LookupEntry("IndexOf", name, null, range.Start.Value, range.End.Value);
-			return Lookup(ref key)
-			       ?? SetLookup(ref key, WithIndex(_stream[range].IndexOf(sequence), range.Start.Value));
-		}
+		public int IndexOf(string sequence, Range range)
+			=> WithIndex(_stream[range].IndexOf(sequence), range.Start.Value);
 
 		public int IndexOf(string sequence, int end)
-		{
-			if (_skipLookup || end - Position < LookupThreshold)
-				return WithPosition(_stream[_position..end].IndexOf(sequence));
+			=> WithPosition(_stream[_position..end].IndexOf(sequence));
 
-			var key = new LookupEntry("IndexOf", sequence, null, end);
-			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end].IndexOf(sequence)));
+		public int IndexOf(string sequence) => WithPosition(_stream[_position..].IndexOf(sequence));
+
+		public int IndexOf(char c, Range range) => WithIndex(_stream[range].IndexOf(c), range.Start.Value);
+
+		public int IndexOf(char c, int? end) => WithPosition(_stream[_position..(end ?? Length)].IndexOf(c));
+
+		public int IndexOfCached(char c, int? end)
+		{
+			end ??= Length;
+
+			if (_skipLookup || end.Value - Position < LookupThreshold)
+				return IndexOf(c, end);
+
+			var key = new LookupEntry("IndexOf", null, c, end);
+			return Lookup(ref key) ?? SetLookup(ref key, IndexOf(c, end));
 		}
 
-		public int IndexOf(string sequence)
+		public int IndexOf(char c) => WithPosition(_stream[_position..].IndexOf(c));
+
+		public int IndexOfCached(char c)
 		{
 			if (_skipLookup || Remaining < LookupThreshold)
-				return WithPosition(_stream[_position..].IndexOf(sequence));
-
-			var key = new LookupEntry("IndexOf", sequence, null, Length);
-			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..].IndexOf(sequence)));
-		}
-
-		public int IndexOf(char c, Range range)
-		{
-			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
-				return WithIndex(_stream[range].IndexOf(c), range.Start.Value);
-
-			var key = new LookupEntry("IndexOf", null, c, range.End.Value, range.Start.Value);
-			return Lookup(ref key) ?? SetLookup(ref key, WithIndex(_stream[range].IndexOf(c), range.Start.Value));
-		}
-
-		public int IndexOf(char c, int? end)
-		{
-			end ??= Length;
-
-			if (_skipLookup || end.Value - Position < LookupThreshold)
-				return WithPosition(_stream[_position..end.Value].IndexOf(c));
-
-			var key = new LookupEntry("IndexOf", null, c, end);
-			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end.Value].IndexOf(c)));
-		}
-
-		public int IndexOf(char c, bool skipLookup = false)
-		{
-			if (_skipLookup || skipLookup || Remaining < LookupThreshold)
-				return WithPosition(_stream[_position..].IndexOf(c));
+				return IndexOf(c);
 
 			var key = new LookupEntry("IndexOf", null, c, Length);
-			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..].IndexOf(c)));
+			return Lookup(ref key) ?? SetLookup(ref key, IndexOf(c));
 		}
 
-		public int LastIndexOf(char c, int? end)
-		{
-			end ??= Length;
+		public int LastIndexOf(char c, int? end) => WithPosition(_stream[_position..(end ?? Length)].LastIndexOf(c));
 
-			if (_skipLookup || end.Value - Position < LookupThreshold)
-				return WithPosition(_stream[_position..end.Value].LastIndexOf(c));
+		public int? IndexOfOrNull(char c)       => IndexOf(c) is var idx && idx < 0 ? null : idx;
+		public int? IndexOfOrNullCached(char c) => IndexOfCached(c) is var idx && idx < 0 ? null : idx;
 
-			var key = new LookupEntry("IndexOf", null, c, end);
-			return Lookup(ref key) ?? SetLookup(ref key, WithPosition(_stream[_position..end.Value].LastIndexOf(c)));
-		}
-
-		public int? IndexOfOrNull(char c) => IndexOf(c) is var idx && idx < 0 ? null : idx;
-
-		public int IndexOfExcept(char match, string except, int? end = null)
-		{
-			if (_skipLookup || Position - (end ?? LastIdx) < LookupThreshold)
-				return IndexOfExceptInner(match, except, end);
-
-			var key = new LookupEntry("IndexOfExcept", except, match, end ?? Length);
-			return Lookup(ref key) ?? SetLookup(ref key, IndexOfExceptInner(match, except, end));
-		}
-
-		private int IndexOfExceptInner(char match, ReadOnlySpan<char> except, int? end = null)
+		public int IndexOfExcept(char match, ReadOnlySpan<char> except, int? end = null)
 		{
 			var stream = end != null ? _stream[_position..end.Value] : _stream[_position..];
 
@@ -600,15 +567,15 @@ public static class MfmParser
 	private static void ParseHashtag(ref ParserState state)
 	{
 		const int delimLength = 1;
-		if (!state.MatchWhitespaceBehind(true) || state.MatchWhitespaceAhead(true))
+		if (!state.MatchWhitespaceBehind(true) || state.MatchWhitespaceAhead(true) || state.Remaining == 1)
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
 			return;
 		}
 
 		state.Seek(delimLength);
-		var endIdx = state.IndexOfAny(HashtagBoundaryChars, nameof(HashtagBoundaryChars));
-		if (endIdx == state.Position || state.Remaining < 1)
+		var endIdx = state.IndexOfAny(HashtagBoundaryChars);
+		if (endIdx == state.Position)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
 			return;
@@ -651,7 +618,7 @@ public static class MfmParser
 
 		state.Seek(delimLength);
 
-		var endIdx = state.IndexOf(delim, state.IndexOfOrNull('\n'));
+		var endIdx = state.IndexOf(delim, state.IndexOfOrNullCached('\n'));
 		if (endIdx == -1 || endIdx == state.Position)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
@@ -671,7 +638,7 @@ public static class MfmParser
 			return;
 		}
 
-		var end = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars), true);
+		var end = state.IndexOfAnyCached(WhitespaceChars, nameof(WhitespaceChars));
 
 		if (end == -1)
 			end = state.Length;
@@ -725,9 +692,16 @@ public static class MfmParser
 
 	private static void ParseUrlBrackets(ref ParserState state)
 	{
+		if (state.HasUnmatchedTag(">"))
+		{
+			state.UpdatePendingTextAndSeekToBoundary();
+			return;
+		}
+
 		state.Seek(1);
 
 		var end = state.IndexOf('>');
+		if (end == -1) state.AddUnmatchedTag(">");
 		if (end == -1 || state.IndexOf('\n', end) != -1)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(1);
@@ -751,21 +725,35 @@ public static class MfmParser
 
 	private static void ParseLink(ref ParserState state)
 	{
-		var silent = state.MatchAhead('?');
+		var silent      = state.MatchAhead('?');
+		var delimLength = silent ? 2 : 1;
+
+		if (silent && state.Remaining == 1)
+		{
+			state.UpdatePendingTextAndSeekToBoundary();
+			return;
+		}
+
+		if (state.HasUnmatchedTag("]") || state.HasUnmatchedTag(")"))
+		{
+			state.UpdatePendingTextAndSeekToBoundary(delimLength);
+			return;
+		}
+
 		if (silent && !state.MatchAhead("?["))
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
 			return;
 		}
 
-		var delimLength = silent ? 2 : 1;
 		state.Seek(delimLength);
 
-		var textEnd = state.IndexOf(']');
+		var textEnd = state.IndexOfCached(']');
+		if (textEnd == -1) state.AddUnmatchedTag("]");
 		if (
 			textEnd == -1
 			|| textEnd == state.Position
-			|| state.IndexOf('\n', textEnd) != -1
+			|| state.IndexOfCached('\n', textEnd) != -1
 			|| textEnd > state.LastIdx - "(http://)".Length
 			|| state.ReadAt(textEnd + 1) != '('
 		)
@@ -775,7 +763,7 @@ public static class MfmParser
 		}
 
 		var linkStart = textEnd + 2;
-		var linkEnd   = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars), linkStart..);
+		var linkEnd   = state.IndexOfAnyCached(WhitespaceChars, nameof(WhitespaceChars), linkStart..);
 
 		if (linkEnd == -1)
 			linkEnd = state.Length;
@@ -783,6 +771,7 @@ public static class MfmParser
 		var closeBracketIdx = state.IndexOf(')', linkStart..linkEnd);
 		if (closeBracketIdx == -1)
 		{
+			if (state.IndexOfCached(')') == -1) state.AddUnmatchedTag(")");
 			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
 			return;
 		}
@@ -817,6 +806,7 @@ public static class MfmParser
 
 			if (bracketStack > -1)
 			{
+				state.AddUnmatchedTag(")");
 				state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
 				return;
 			}
@@ -847,7 +837,7 @@ public static class MfmParser
 
 		state.Seek(1);
 
-		var end = state.IndexOfAny(WhitespaceChars, nameof(WhitespaceChars));
+		var end = state.IndexOfAnyCached(WhitespaceChars, nameof(WhitespaceChars));
 		if (end == -1)
 			end = state.Length;
 
@@ -966,7 +956,7 @@ public static class MfmParser
 
 		lookbehind = 0;
 
-		var end = state.IndexOf('\n');
+		var end = state.IndexOfCached('\n');
 		if (end == -1)
 			end = state.Length;
 
@@ -989,7 +979,7 @@ public static class MfmParser
 				break;
 
 			state.Seek(2);
-			end = state.IndexOf('\n');
+			end = state.IndexOfCached('\n');
 
 			lookbehind = 2;
 			var depth = 0;
@@ -1286,7 +1276,7 @@ public static class MfmParser
 		{
 			state.Seek(delimLength);
 
-			var endIdx = state.IndexOfExcept(delim, except, sameLine ? state.IndexOfOrNull('\n') : null);
+			var endIdx = state.IndexOfExcept(delim, except, sameLine ? state.IndexOfOrNullCached('\n') : null);
 
 			if (
 				endIdx == -1
@@ -1315,7 +1305,7 @@ public static class MfmParser
 			state.Seek(delimLength);
 
 			var endIdx = sameLine
-				? state.IndexOf(delim, state.IndexOfOrNull('\n') ?? state.Length)
+				? state.IndexOf(delim, state.IndexOfOrNullCached('\n') ?? state.Length)
 				: state.IndexOf(delim);
 
 			if (
@@ -1367,7 +1357,7 @@ public static class MfmParser
 			state.Seek(openTagLength);
 
 			var end            = -1;
-			var searchSpaceEnd = sameLine ? state.IndexOf('\n') : -1;
+			var searchSpaceEnd = sameLine ? state.IndexOfCached('\n') : -1;
 
 			if (searchSpaceEnd == -1)
 				searchSpaceEnd = state.Length;
