@@ -64,7 +64,8 @@ public static class MfmParser
 		private AutoResizeArray<IMfmInlineNode> _recurseResults = new();
 
 		// Cache for (possibly) expensive lookups
-		private Dictionary<LookupEntry, int>? _lookup = null;
+		private Dictionary<LookupEntry, int>? _lookup            = null;
+		private HashSet<string>?              _unmatchedCloseTag = null;
 
 		// Helper expression-bodied properties
 		public int  Position    => _position;
@@ -410,6 +411,15 @@ public static class MfmParser
 			}
 
 			return WithPosition(idx);
+		}
+
+		// Closing tag methods
+		public bool HasUnmatchedTag(string tag) => _unmatchedCloseTag?.Contains(tag) ?? false;
+
+		public void AddUnmatchedTag(string tag)
+		{
+			if (_skipLookup && _unmatchedCloseTag is null) return;
+			(_unmatchedCloseTag ??= []).Add(tag);
 		}
 	}
 
@@ -1337,7 +1347,7 @@ public static class MfmParser
 
 		return (ref ParserState state) =>
 		{
-			if (requireStartOfLine && !state.MatchNewlineBehind(true))
+			if (state.HasUnmatchedTag(closeTag) || (requireStartOfLine && !state.MatchNewlineBehind(true)))
 			{
 				state.UpdatePendingTextAndSeekToBoundary();
 				return;
@@ -1408,13 +1418,15 @@ public static class MfmParser
 			}
 			else
 			{
-				var closeTagIdx            = state.IndexOf(closeTag, searchSpaceEnd);
-				if (closeTagIdx != -1) end = closeTagIdx;
+				var closeTagIdx = state.IndexOf(closeTag, searchSpaceEnd);
+				if (closeTagIdx != -1)
+					end = closeTagIdx;
 			}
 
 			if (end == -1)
 			{
 				state.UpdatePendingTextBehindAndSeekToBoundary(openTagLength + consumedNewlines);
+				if (!sameLine) state.AddUnmatchedTag(closeTag);
 				return;
 			}
 
