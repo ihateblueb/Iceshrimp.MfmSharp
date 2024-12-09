@@ -13,17 +13,14 @@ public interface IMfmInlineNode : IMfmNode;
 
 public interface IMfmBlockNode : IMfmNode;
 
-public record MfmTextNode(string Text) : IMfmInlineNode
+public class MfmTextNode(string text) : IMfmInlineNode
 {
+	public readonly string Text = text;
+
 	public override string ToString() => Text;
-
-	public static implicit operator MfmTextNode(string text) => new(text);
 }
 
-public record MfmItalicNode(
-	IMfmInlineNode[] Children,
-	MfmItalicNode.DelimiterType Type
-) : IMfmInlineNode
+public class MfmItalicNode(IMfmInlineNode[] children, MfmItalicNode.DelimiterType type) : IMfmInlineNode
 {
 	public enum DelimiterType
 	{
@@ -32,22 +29,20 @@ public record MfmItalicNode(
 		HtmlTag
 	}
 
+	public readonly DelimiterType Type = type;
+
+	IMfmInlineNode[] IMfmNode.Children => children;
+
 	public override string ToString() => Type switch
 	{
-		DelimiterType.Asterisk   => $"*{Children.Serialize(trim: false)}*",
-		DelimiterType.Underscore => $"_{Children.Serialize(trim: false)}_",
-		DelimiterType.HtmlTag    => $"<i>{Children.Serialize(trim: false)}</i>",
+		DelimiterType.Asterisk   => $"*{children.Serialize(trim: false)}*",
+		DelimiterType.Underscore => $"_{children.Serialize(trim: false)}_",
+		DelimiterType.HtmlTag    => $"<i>{children.Serialize(trim: false)}</i>",
 		_                        => throw new ArgumentOutOfRangeException(nameof(Type), Type, null)
 	};
-
-	public override int  GetHashCode()                => HashCode.Combine(Children, Type);
-	public virtual  bool Equals(MfmItalicNode? other) => Type == other?.Type && Children.SequenceEqual(other.Children);
 }
 
-public record MfmBoldNode(
-	IMfmInlineNode[] Children,
-	MfmBoldNode.DelimiterType Type
-) : IMfmInlineNode
+public class MfmBoldNode(IMfmInlineNode[] children, MfmBoldNode.DelimiterType type) : IMfmInlineNode
 {
 	public enum DelimiterType
 	{
@@ -56,22 +51,20 @@ public record MfmBoldNode(
 		HtmlTag
 	}
 
+	public readonly DelimiterType Type = type;
+
+	IMfmInlineNode[] IMfmNode.Children => children;
+
 	public override string ToString() => Type switch
 	{
-		DelimiterType.Asterisk   => $"**{Children.Serialize(trim: false)}**",
-		DelimiterType.Underscore => $"__{Children.Serialize(trim: false)}__",
-		DelimiterType.HtmlTag    => $"<b>{Children.Serialize(trim: false)}</b>",
+		DelimiterType.Asterisk   => $"**{children.Serialize(trim: false)}**",
+		DelimiterType.Underscore => $"__{children.Serialize(trim: false)}__",
+		DelimiterType.HtmlTag    => $"<b>{children.Serialize(trim: false)}</b>",
 		_                        => throw new ArgumentOutOfRangeException(nameof(Type), Type, null)
 	};
-
-	public override int  GetHashCode()              => HashCode.Combine(Children, Type);
-	public virtual  bool Equals(MfmBoldNode? other) => Type == other?.Type && Children.SequenceEqual(other.Children);
 }
 
-public record MfmStrikeNode(
-	IMfmInlineNode[] Children,
-	MfmStrikeNode.DelimiterType Type
-) : IMfmInlineNode
+public class MfmStrikeNode(IMfmInlineNode[] children, MfmStrikeNode.DelimiterType type) : IMfmInlineNode
 {
 	public enum DelimiterType
 	{
@@ -79,127 +72,137 @@ public record MfmStrikeNode(
 		HtmlTag
 	}
 
+	public readonly DelimiterType Type = type;
+
+	IMfmInlineNode[] IMfmNode.Children => children;
+
 	public override string ToString() => Type switch
 	{
-		DelimiterType.Tilde   => $"~~{Children.Serialize(trim: false)}~~",
-		DelimiterType.HtmlTag => $"<s>{Children.Serialize(trim: false)}</s>",
+		DelimiterType.Tilde   => $"~~{children.Serialize(trim: false)}~~",
+		DelimiterType.HtmlTag => $"<s>{children.Serialize(trim: false)}</s>",
 		_                     => throw new ArgumentOutOfRangeException(nameof(Type), Type, null)
 	};
-
-	public override int  GetHashCode()                => HashCode.Combine(Children, Type);
-	public virtual  bool Equals(MfmStrikeNode? other) => Type == other?.Type && Children.SequenceEqual(other.Children);
 }
 
-public record MfmInlineCodeNode(string Code) : IMfmInlineNode
+public class MfmInlineCodeNode(string code) : IMfmInlineNode
 {
+	public readonly string Code = code;
+
 	public override string ToString() => $"`{Code}`";
 }
 
-public record MfmPlainNode(string Text) : IMfmInlineNode
+public class MfmPlainNode(string text) : IMfmInlineNode
 {
-	public IMfmInlineNode[] Children => [new MfmTextNode(Text)];
+	public readonly string Text = text;
+
+	IMfmInlineNode[] IMfmNode.Children => [new MfmTextNode(Text)];
 
 	public override string ToString() => $"<plain>{Text}</plain>";
 }
 
-public record MfmSmallNode(IMfmInlineNode[] Children) : IMfmInlineNode
+public class MfmSmallNode(IMfmInlineNode[] children) : IMfmInlineNode
 {
-	public override string ToString() => $"<small>{Children.Serialize(trim: false)}</small>";
+	IMfmInlineNode[] IMfmNode.Children => children;
 
-	public override int  GetHashCode()               => Children.GetHashCode();
-	public virtual  bool Equals(MfmSmallNode? other) => other != null && Children.SequenceEqual(other.Children);
+	public override string ToString() => $"<small>{children.Serialize(trim: false)}</small>";
 }
 
-public record MfmEmojiCodeNode(string Name) : IMfmInlineNode
+public class MfmEmojiCodeNode(string name) : IMfmInlineNode
 {
+	public readonly string Name = name;
+
 	public override string ToString() => $":{Name}:";
 }
 
-public record MfmHashtagNode(string Hashtag) : IMfmInlineNode
+public class MfmHashtagNode(string hashtag) : IMfmInlineNode
 {
+	public readonly string Hashtag = hashtag;
+
 	public override string ToString() => $"#{Hashtag}";
 }
 
 [PublicAPI]
-public record MfmMentionNode(string User, string? Host) : IMfmInlineNode
+public class MfmMentionNode(string user, string? host) : IMfmInlineNode
 {
-	public string Acct => Host is null ? User : $"{User}@{Host}";
+	public readonly string  User = user;
+	public readonly string? Host = host;
+	public string  Acct => Host is null ? User : $"{User}@{Host}";
 
 	public override string ToString() => $"@{Acct}";
 }
 
-public record MfmUrlNode(string Url, bool Brackets) : IMfmInlineNode
+public class MfmUrlNode(string url, bool brackets) : IMfmInlineNode
 {
+	public readonly string Url      = url;
+	public readonly bool   Brackets = brackets;
+
 	public override string ToString() => Brackets ? $"<{Url}>" : Url;
 }
 
-public record MfmLinkNode(string Url, string Text, bool Silent) : IMfmInlineNode
+public class MfmLinkNode(string url, string text, bool silent) : IMfmInlineNode
 {
+	public readonly string Url    = url;
+	public readonly string Text   = text;
+	public readonly bool   Silent = silent;
+
 	public override string ToString() => (Silent ? "?" : "") + $"[{Text}]({Url})";
 }
 
-public record MfmInlineMathNode(string Formula) : IMfmInlineNode
+public class MfmInlineMathNode(string formula) : IMfmInlineNode
 {
+	public readonly string Formula = formula;
+
 	public override string ToString() => $@"\({Formula}\)";
 }
 
-public record MfmFnNode(
-	string Name,
-	Dictionary<string, string?>? Args,
-	IMfmInlineNode[] Children
-) : IMfmInlineNode
+public class MfmFnNode(string name, Dictionary<string, string?>? args, IMfmInlineNode[] children) : IMfmInlineNode
 {
+	public readonly string                       Name = name;
+	public readonly Dictionary<string, string?>? Args = args;
+
+	IMfmInlineNode[] IMfmNode.Children => children;
+
 	private string SerializedArgs => Args is { Count: > 0 }
 		? $".{string.Join(',', Args.Select(p => p.Value != null ? $"{p.Key}={p.Value}" : $"{p.Key}"))}"
 		: "";
 
-	public override string ToString() => $"$[{Name}{SerializedArgs} {Children.Serialize(trim: false)}]";
-
-	public override int GetHashCode() => HashCode.Combine(Name, Args, Children);
-
-	public virtual bool Equals(MfmFnNode? other)
-	{
-		if (other == null) return false;
-		if (Name != other.Name) return false;
-		if ((Args == null) != (other.Args == null)) return false;
-		if (Args == null || other.Args == null) return true;
-		if (Args.Count != other.Args.Count) return false;
-		// ReSharper disable once UsageOfDefaultStructEquality
-		return !Args.Except(other.Args).Any();
-	}
+	public override string ToString() => $"$[{Name}{SerializedArgs} {children.Serialize(trim: false)}]";
 }
 
-public record MfmQuoteNode(IMfmInlineNode[] Children, bool Nested = false) : IMfmInlineNode
+public class MfmQuoteNode(IMfmInlineNode[] children, bool nested = false) : IMfmInlineNode
 {
+	IMfmInlineNode[] IMfmNode.Children => children;
+
 	public override string ToString()
 	{
-		var res = string.Join('\n', Children.Serialize(trim: true)
+		var res = string.Join('\n', children.Serialize(trim: true)
 		                                    .Split('\n')
 		                                    .Select(p => p.StartsWith('>') ? $">{p}" : $"> {p}"));
 
-		return Nested ? '\n' + res + '\n' : res;
+		return nested ? '\n' + res + '\n' : res;
 	}
-
-	public override int  GetHashCode()               => Children.GetHashCode();
-	public virtual  bool Equals(MfmQuoteNode? other) => other is not null && Children.SequenceEqual(other.Children);
 }
 
-public record MfmCodeBlockNode(string Code, string? Lang) : IMfmBlockNode
+public class MfmCodeBlockNode(string code, string? lang) : IMfmBlockNode
 {
+	public readonly string  Code = code;
+	public readonly string? Lang = lang;
+
 	public override string ToString() => $"\n```{Lang ?? ""}\n{Code}\n```\n";
 }
 
-public record MfmMathBlockNode(string Formula) : IMfmBlockNode
+public class MfmMathBlockNode(string formula) : IMfmBlockNode
 {
+	public readonly string Formula = formula;
+
 	public override string ToString() => $@"\[{Formula}\]";
 }
 
-public record MfmCenterNode(IMfmInlineNode[] Children) : IMfmBlockNode
+public class MfmCenterNode(IMfmInlineNode[] children) : IMfmBlockNode
 {
-	public override string ToString() => $"<center>\n{Children.Serialize(trim: false)}\n</center>";
+	IMfmInlineNode[] IMfmNode.Children => children;
 
-	public override int  GetHashCode()                => Children.GetHashCode();
-	public virtual  bool Equals(MfmCenterNode? other) => other != null && Children.SequenceEqual(other.Children);
+	public override string ToString() => $"<center>\n{children.Serialize(trim: false)}\n</center>";
 }
 
 public static class MfmExtensions

@@ -1136,20 +1136,20 @@ public static class MfmParser
 					while (stack.TryPeek(out var head) && head.depth >= depth)
 					{
 						stack.Pop();
-						var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
+						var nestQuote = new MfmQuoteNode(results.ToArray(), nested: true);
 						while (--currentDepth > head.depth)
-							nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
+							nestQuote = new MfmQuoteNode([nestQuote], nested: true);
 						results = head.results.Add(nestQuote);
 					}
 
 					if (currentDepth > depth)
 					{
-						var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
+						var nestQuote = new MfmQuoteNode(results.ToArray(), nested: true);
 						results = new([nestQuote]);
 
 						while (--currentDepth > depth)
 						{
-							nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
+							nestQuote = new MfmQuoteNode([nestQuote], nested: true);
 							results   = new([nestQuote]);
 						}
 					}
@@ -1166,14 +1166,14 @@ public static class MfmParser
 
 		while (stack.TryPop(out var head))
 		{
-			var nestQuote = new MfmQuoteNode(results.ToArray(), Nested: true);
+			var nestQuote = new MfmQuoteNode(results.ToArray(), nested: true);
 			while (--currentDepth > head.depth)
-				nestQuote = new MfmQuoteNode([nestQuote], Nested: true);
+				nestQuote = new MfmQuoteNode([nestQuote], nested: true);
 			results = head.results.Add(nestQuote);
 		}
 
 		while (currentDepth-- > 0)
-			results = new([new MfmQuoteNode(results.ToArray(), Nested: true)]);
+			results = new([new MfmQuoteNode(results.ToArray(), nested: true)]);
 
 		state.AddInlineResult(new MfmQuoteNode(results.ToArray()));
 
