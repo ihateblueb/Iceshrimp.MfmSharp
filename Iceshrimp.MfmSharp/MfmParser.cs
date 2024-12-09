@@ -3,7 +3,7 @@ using JetBrains.Annotations;
 
 namespace Iceshrimp.MfmSharp;
 
-using RecursionInfo = Dictionary<string, (int idx, bool open)[]>;
+using RecursionInfo = Dictionary<string, ((int idx, bool open)[] lut, int pointer)>;
 
 [PublicAPI]
 public static class MfmParser
@@ -472,7 +472,7 @@ public static class MfmParser
 				luts[tag]   =  luts[tag].Add((i + Offset, diff is 1));
 			}
 
-			return _recursionInfo = _openTags.ToDictionary(p => p, p => luts[p].AsArray());
+			return _recursionInfo = _openTags.ToDictionary(p => p, p => (luts[p].AsArray(), 0));
 		}
 	}
 
@@ -1449,16 +1449,20 @@ public static class MfmParser
 
 			if (allowNesting)
 			{
-				var lut            = state.RecursionInfo[openTag];
+				var info = state.RecursionInfo[openTag];
+				var (lut, startIdx) = info;
 				var offset         = state.Offset;
 				var pos            = state.Position + offset;
 				var until          = searchSpaceEnd + offset;
-				var closeTagLutIdx = Array.FindIndex(lut, p => !p.open && p.idx >= pos && p.idx < until);
+				var closeTagLutIdx = Array.FindIndex(lut, startIdx, p => !p.open && p.idx >= pos && p.idx < until);
 				var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx].idx;
-				
-				var searchSpaceStart = closeTagIdx != -1 ? closeTagIdx : pos;
-				var openTagLutIdx    = Array.FindIndex(lut, p => p.open && p.idx >= pos && p.idx < searchSpaceStart);
-				var openTagIdx       = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx].idx;
+
+				var count         = closeTagIdx != -1 ? closeTagLutIdx - startIdx : lut.Length - startIdx;
+				var openTagLutIdx = Array.FindIndex(lut, startIdx, count, p => p.open && p.idx >= pos);
+				var openTagIdx    = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx].idx;
+
+				if (openTagLutIdx != -1)
+					state.RecursionInfo[openTag] = info with { pointer = openTagLutIdx };
 
 				if (closeTagIdx != -1)
 				{
@@ -1470,8 +1474,8 @@ public static class MfmParser
 					{
 						var tagStack = 1;
 
-						var i = openTagLutIdx - 1;
-						while (++i < lut.Length)
+						var i = openTagLutIdx;
+						while (i < lut.Length)
 						{
 							if (lut[i].idx >= until)
 								break;
@@ -1486,6 +1490,8 @@ public static class MfmParser
 
 							if (!lut[i].open)
 								closeTagIdx = lut[i].idx - offset;
+
+							i++;
 						}
 
 						if (tagStack > RecursionLimit)
