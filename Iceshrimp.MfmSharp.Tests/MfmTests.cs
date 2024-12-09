@@ -14,7 +14,7 @@ public class MfmTests
 	private static void AssertEquals(string input, List<IMfmNode> expected, string? canonical = null)
 	{
 		var res = MfmParser.Parse(input);
-		res.Should().Equal(expected);
+		res.Should().Equal(expected, MfmNodeEqual);
 		res.Serialize().Should().BeEquivalentTo(canonical ?? input);
 	}
 
@@ -945,7 +945,7 @@ public class MfmTests
 		AssertEquals("$[test.a\n=b test]", ["$[test.a\n=b test]".ToMfm()]);
 		AssertEquals("$[test.a=\nb test]", ["$[test.a=\nb test]".ToMfm()]);
 		AssertEquals("$[test.a=b\n test]", ["$[test.a=b\n test]".ToMfm()]);
-		AssertEquals("$[test.a=b \ntest]", [new MfmFnNode("test", new() { ["a"] = "b" }, ["\n test".ToMfm()])]);
+		AssertEquals("$[test.a=b \ntest]", [new MfmFnNode("test", new() { ["a"] = "b" }, ["\ntest".ToMfm()])]);
 
 		// Nesting
 		AssertEquals("$[test1 $[test2 inner]]",
@@ -1004,7 +1004,9 @@ public class MfmTests
 				             "\n".ToMfm(),
 				             new MfmFnNode("position", new() { ["y"] = "9" },
 				             [
-					             new MfmTextNode($":neocat:{new string(' ', 50)}:neocat_aww:")
+					             new MfmEmojiCodeNode("neocat"),
+					             new string(' ', 50).ToMfm(),
+					             new MfmEmojiCodeNode("neocat_aww")
 				             ]),
 				             "\n".ToMfm(),
 				             new MfmFnNode("position", new() { ["y"] = "4.3" },
@@ -1026,14 +1028,14 @@ public class MfmTests
 							             " ".ToMfm(),
 							             new MfmFnNode("scale", new() { ["x"] = "0.5", ["y"] = "0.5" },
 							             [
-								             " \n\u26aa".ToMfm(),
+								             "\n\u26aa".ToMfm(),
 								             new MfmFnNode("position", new() { ["x"] = "-16.5" },
 								             [
 									             new MfmFnNode("scale", new() { ["x"] = "10" },
 									             [
 										             new MfmFnNode("scale", new() { ["x"] = "10" },
 										             [
-											             "\u2b1b⚪".ToMfm()
+											             "\u2b1b".ToMfm()
 										             ])										             
 									             ])
 								             ]),
@@ -1049,8 +1051,7 @@ public class MfmTests
 								             ])
 							             ])
 						             ])
-					             ]),
-					             "\n".ToMfm()
+					             ])
 				             ]),
 				             // @formatter:on
 				             "\n\n\n".ToMfm(),
@@ -1110,7 +1111,7 @@ public class MfmTests
 			return sb.ToString();
 		}
 
-		IMfmInlineNode GetExpected(int count, int remaining = limit)
+		IMfmInlineNode GetExpected(int count, int remaining = limit + 1)
 		{
 			if (remaining <= 0)
 				return new MfmTextNode(GetMfm(count));
@@ -1132,4 +1133,127 @@ public class MfmTests
 		=> MfmParser.Parse((string)typeof(MfmExamples).GetMethod(name)!.Invoke(null, [])!);
 
 	#endregion MfmExamples
+	
+		private static bool MfmNodeEqual(IMfmNode a, IMfmNode b)
+	{
+		if (a.GetType() != b.GetType()) return false;
+
+		if (!a.Children.SequenceEqual(b.Children, MfmNodeEquality.Instance))
+			return false;
+
+		switch (a)
+		{
+			case MfmTextNode textNode when ((MfmTextNode)b).Text != textNode.Text:
+				return false;
+			case MfmItalicNode ax:
+			{
+				var bx = (MfmItalicNode)b;
+				if (bx.Type != ax.Type) return false;
+				break;
+			}
+			case MfmBoldNode ax:
+			{
+				var bx = (MfmBoldNode)b;
+				if (bx.Type != ax.Type) return false;
+				break;
+			}
+			case MfmStrikeNode ax:
+			{
+				var bx = (MfmStrikeNode)b;
+				if (bx.Type != ax.Type) return false;
+				break;
+			}
+			case MfmMentionNode ax:
+			{
+				var bx = (MfmMentionNode)b;
+				if (bx.User != ax.User) return false;
+				if (bx.Host != ax.Host) return false;
+				break;
+			}
+			case MfmCodeBlockNode ax:
+			{
+				var bx = (MfmCodeBlockNode)b;
+				if (ax.Code != bx.Code) return false;
+				if (ax.Lang != bx.Lang) return false;
+				break;
+			}
+			case MfmInlineCodeNode ax:
+			{
+				var bx = (MfmInlineCodeNode)b;
+				if (ax.Code != bx.Code) return false;
+				break;
+			}
+			case MfmMathBlockNode ax:
+			{
+				var bx = (MfmMathBlockNode)b;
+				if (ax.Formula != bx.Formula) return false;
+				break;
+			}
+			case MfmInlineMathNode ax:
+			{
+				var bx = (MfmInlineMathNode)b;
+				if (ax.Formula != bx.Formula) return false;
+				break;
+			}
+			case MfmEmojiCodeNode ax:
+			{
+				var bx = (MfmEmojiCodeNode)b;
+				if (ax.Name != bx.Name) return false;
+				break;
+			}
+			case MfmHashtagNode ax:
+			{
+				var bx = (MfmHashtagNode)b;
+				if (ax.Hashtag != bx.Hashtag) return false;
+				break;
+			}
+			case MfmUrlNode ax:
+			{
+				var bx = (MfmUrlNode)b;
+				if (ax.Url != bx.Url) return false;
+				if (ax.Brackets != bx.Brackets) return false;
+				break;
+			}
+			case MfmLinkNode ax:
+			{
+				var bx = (MfmLinkNode)b;
+				if (ax.Url != bx.Url) return false;
+				if (ax.Silent != bx.Silent) return false;
+				break;
+			}
+			case MfmFnNode ax:
+			{
+				var bx = (MfmFnNode)b;
+				if (ax.Name != bx.Name) return false;
+				if ((ax.Args == null) != (bx.Args == null)) return false;
+				if (ax.Args == null || bx.Args == null) return true;
+				if (ax.Args.Count != bx.Args.Count) return false;
+				// ReSharper disable once UsageOfDefaultStructEquality
+				if (ax.Args.Except(bx.Args).Any()) return false;
+
+				break;
+			}
+		}
+
+		return true;
+	}
+
+	private class MfmNodeEquality : IEqualityComparer<IMfmNode>
+	{
+		public static readonly MfmNodeEquality Instance = new();
+		
+		public bool Equals(IMfmNode? x, IMfmNode? y)
+		{
+			if (x == null && y == null) return true;
+			if (x == null && y != null) return false;
+			if (x != null && y == null) return false;
+
+			return MfmNodeEqual(x!, y!);
+		}
+
+		public int GetHashCode(IMfmNode obj)
+		{
+			return obj.GetHashCode();
+		}
+	}
 }
