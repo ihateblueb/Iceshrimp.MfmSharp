@@ -3,6 +3,8 @@ using JetBrains.Annotations;
 
 namespace Iceshrimp.MfmSharp;
 
+using RecursionInfo = Dictionary<string, (int idx, bool open)[]>;
+
 [PublicAPI]
 public static class MfmParser
 {
@@ -47,23 +49,11 @@ public static class MfmParser
 
 	internal delegate void Parser(ref ParserState arg);
 
-	internal delegate void Accumulator(ref ParserState arg, int endIdx);
+	internal delegate void Accumulator(ref ParserState arg, int endIdx, RecursionInfo? recursionInfo = null);
 
 	[PublicAPI]
 	internal ref struct ParserState(ReadOnlySpan<char> input, ParseMode mode = ParseMode.Full)
 	{
-		// Recurse constructor
-		private ParserState(
-			ReadOnlySpan<char> input, ParseMode mode, int depth, int offset, Dictionary<LookupEntry, int>? lookupCache,
-			HashSet<string>? unmatchedTags
-		) : this(input, mode)
-		{
-			_lookupCache   = lookupCache;
-			_unmatchedTags = unmatchedTags;
-			_depth         = depth;
-			_offset        = _lookupCache is not null ? offset : null;
-		}
-
 		// Basic private state
 		private readonly ReadOnlySpan<char> _stream      = input;
 		private          bool               _closed      = false;
@@ -79,11 +69,13 @@ public static class MfmParser
 		// Cache for (possibly) expensive lookups
 		private Dictionary<LookupEntry, int>? _lookupCache   = null;
 		private HashSet<string>?              _unmatchedTags = null;
+		private RecursionInfo?                _recursionInfo = null;
 		private int?                          _offset        = null;
 
 		// Helper expression-bodied properties
 		public int  Position    => _position;
 		public int  Depth       => _depth;
+		public int  Offset      => _offset ?? 0;
 		public int  Length      => _stream.Length;
 		public int  Remaining   => Length - _position;
 		public int  LastIdx     => _stream.Length - 1;
@@ -93,7 +85,8 @@ public static class MfmParser
 		public bool IsLast      => _position == LastIdx;
 		public bool IsStart     => _position == 0;
 
-		public ParseMode Mode => mode;
+		public RecursionInfo? RecursionInfo => _recursionInfo;
+		public ParseMode      Mode          => mode;
 
 		public SearchValues<char> BoundaryChars => mode switch
 		{
@@ -126,7 +119,7 @@ public static class MfmParser
 		public void SeekToEnd() => _position = Length;
 
 		// Recursion helper method
-		public IMfmInlineNode[] Recurse(int end)
+		public IMfmInlineNode[] Recurse(int end, RecursionInfo? recursionInfo = null)
 		{
 			if (Mode is ParseMode.Simple)
 				throw new InvalidOperationException("Cannot recurse in simple mode");
@@ -136,8 +129,15 @@ public static class MfmParser
 			if (_depth == RecursionLimit || !stream.ContainsAny(BoundaryChars))
 				return [new MfmTextNode(stream.ToString())];
 
-			var offset = _position + (_offset ?? 0);
-			var state  = new ParserState(stream, ParseMode.Inline, _depth + 1, offset, _lookupCache, _unmatchedTags);
+			var state = new ParserState(stream, ParseMode.Inline)
+			{
+				_depth         = _depth + 1,
+				_offset        = _position + (_offset ?? 0),
+				_lookupCache   = _lookupCache,
+				_unmatchedTags = _unmatchedTags,
+				_recursionInfo = recursionInfo ?? _recursionInfo
+			};
+
 			while (!state.IsEos)
 				ParseNode(ref state);
 
@@ -1098,7 +1098,7 @@ public static class MfmParser
 	private static Parser ParseCodeBlockOrInlineCode(ParserState state)
 		=> state.IsStart && state.MatchAhead("```") ? ParseCodeBlock : ParseInlineCode;
 
-	private static readonly Accumulator ItalicAccumulator = (ref ParserState state, int endIdx) =>
+	private static readonly Accumulator ItalicAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _) =>
 	{
 		var type = state.PrevChar switch
 		{
@@ -1110,7 +1110,7 @@ public static class MfmParser
 		state.AddInlineResult(new MfmItalicNode(state.Recurse(endIdx), type));
 	};
 
-	private static readonly Accumulator BoldAccumulator = (ref ParserState state, int endIdx) =>
+	private static readonly Accumulator BoldAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _) =>
 	{
 		var type = state.PrevChar switch
 		{
@@ -1122,7 +1122,7 @@ public static class MfmParser
 		state.AddInlineResult(new MfmBoldNode(state.Recurse(endIdx), type));
 	};
 
-	private static readonly Accumulator StrikeAccumulator = (ref ParserState state, int endIdx) =>
+	private static readonly Accumulator StrikeAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _) =>
 	{
 		var type = state.PrevChar switch
 		{
@@ -1133,13 +1133,13 @@ public static class MfmParser
 		state.AddInlineResult(new MfmStrikeNode(state.Recurse(endIdx), type));
 	};
 
-	private static readonly Accumulator InlineMathAccumulator = (ref ParserState state, int endIdx)
+	private static readonly Accumulator InlineMathAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _)
 		=> state.AddInlineResult(new MfmInlineMathNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator MathBlockAccumulator = (ref ParserState state, int endIdx)
+	private static readonly Accumulator MathBlockAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _)
 		=> state.AddBlockResult(new MfmMathBlockNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator CodeBlockAccumulator = (ref ParserState state, int endIdx) =>
+	private static readonly Accumulator CodeBlockAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _) =>
 	{
 		if (endIdx == state.Position)
 			return;
@@ -1159,7 +1159,7 @@ public static class MfmParser
 		state.AddBlockResult(new MfmCodeBlockNode(state.ReadTo(endIdx).ToString(), lang));
 	};
 
-	private static readonly Accumulator CenterAccumulator = (ref ParserState state, int endIdx) =>
+	private static readonly Accumulator CenterAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _) =>
 	{
 		if (state.CurrentChar == '\n' && state.Position < endIdx)
 			state.Seek(1);
@@ -1169,13 +1169,13 @@ public static class MfmParser
 		state.AddBlockResult(new MfmCenterNode(state.Recurse(endIdx)));
 	};
 
-	private static readonly Accumulator SmallAccumulator = (ref ParserState state, int endIdx)
+	private static readonly Accumulator SmallAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _)
 		=> state.AddInlineResult(new MfmSmallNode(state.Recurse(endIdx)));
 
-	private static readonly Accumulator PlainAccumulator = (ref ParserState state, int endIdx)
+	private static readonly Accumulator PlainAccumulator = (ref ParserState state, int endIdx, RecursionInfo? _)
 		=> state.AddInlineResult(new MfmPlainNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator FnAccumulator = (ref ParserState state, int endIdx) =>
+	private static readonly Accumulator FnAccumulator = (ref ParserState state, int endIdx, RecursionInfo? rec) =>
 	{
 		var descriptorEndIdx = state.IndexOf(' ', endIdx);
 		if (descriptorEndIdx == -1 || endIdx - descriptorEndIdx <= 1)
@@ -1250,7 +1250,7 @@ public static class MfmParser
 
 		state.SeekTo(descriptorEndIdx);
 		state.Seek(1);
-		state.AddInlineResult(new MfmFnNode(name.ToString(), args, state.Recurse(endIdx)));
+		state.AddInlineResult(new MfmFnNode(name.ToString(), args, state.Recurse(endIdx, rec)));
 		state.SeekTo(endIdx);
 		state.Seek(1);
 	};
@@ -1350,9 +1350,10 @@ public static class MfmParser
 		int consumeMaxTrailingNewlines = 0
 	)
 	{
-		var openTagLength  = openTag.Length;
-		var closeTagLength = closeTag.Length;
-		var tags           = SearchValues.Create([openTag, closeTag], StringComparison.Ordinal);
+		var openTagLength          = openTag.Length;
+		var closeTagLength         = closeTag.Length;
+		var recursionInfoThreshold = openTagLength + closeTagLength;
+		var tags                   = SearchValues.Create([openTag, closeTag], StringComparison.Ordinal);
 
 		return (ref ParserState state) =>
 		{
@@ -1381,40 +1382,74 @@ public static class MfmParser
 			if (searchSpaceEnd == -1)
 				searchSpaceEnd = state.Length;
 
+			var recursionInfo = state.RecursionInfo;
+			var lut           = recursionInfo?.GetValueOrDefault(openTag, null!);
 			if (allowNesting)
 			{
-				var closeTagIdx = state.IndexOf(closeTag, searchSpaceEnd);
+				var closeTagIdx = lut != null ? 0 : state.IndexOf(closeTag, searchSpaceEnd);
 				if (closeTagIdx != -1)
 				{
-					var openTagIdx = state.IndexOf(openTag, closeTagIdx);
+					var openTagIdx = lut != null ? 0 : state.IndexOf(openTag, closeTagIdx);
 					if (openTagIdx == -1)
 					{
 						end = closeTagIdx;
 					}
 					else
 					{
-						var tagStack = 1;
-						var slice    = state.Slice(++openTagIdx..searchSpaceEnd);
-
-						var i = -1;
-						while (tagStack >= 0 && ++i < slice.Length)
+						int tagStack;
+						if (lut == null)
 						{
-							var next = slice[i..].IndexOfAny(tags);
-							if (next is -1)
+							var newLut = new AutoResizeArray<(int idx, bool open)>([(openTagIdx, true)]);
+
+							tagStack = 1;
+							var slice = state.Slice(++openTagIdx..searchSpaceEnd);
+
+							var i = -1;
+							while (tagStack >= 0 && ++i < slice.Length)
 							{
-								end = closeTagIdx;
-								break;
+								var next = slice[i..].IndexOfAny(tags);
+								if (next is -1)
+								{
+									end = closeTagIdx;
+									break;
+								}
+
+								i += next;
+
+								int diff;
+								if (openTagLength <= closeTagLength)
+									diff = slice[i..(i + openTagLength)].SequenceEqual(openTag) ? 1 : -1;
+								else
+									diff = slice[i..(i + closeTagLength)].SequenceEqual(closeTag) ? -1 : 1;
+
+								tagStack += diff;
+
+								if (tagStack == -1)
+									end = i + openTagIdx;
+								else
+									newLut.Add((i + openTagIdx + state.Offset, diff is 1));
 							}
 
-							i += next;
+							if (end != -1 && end - state.Position > recursionInfoThreshold)
+								(recursionInfo ??= [])[openTag] = newLut.ToArray();
+						}
+						else
+						{
+							tagStack = 0;
 
-							if (openTagLength <= closeTagLength)
-								tagStack += slice[i..(i + openTagLength)].SequenceEqual(openTag) ? 1 : -1;
-							else
-								tagStack += slice[i..(i + closeTagLength)].SequenceEqual(closeTag) ? -1 : 1;
+							var i = -1;
+							while (tagStack >= 0 && ++i < lut.Length)
+							{
+								if (lut[i].idx <= state.Position + state.Offset)
+									continue;
+								if (lut[i].idx > state.LastIdx + state.Offset)
+									break;
 
-							if (tagStack == -1)
-								end = i + openTagIdx;
+								tagStack += lut[i].open ? 1 : -1;
+
+								if (tagStack == -1)
+									end = lut[i].idx - state.Offset;
+							}
 						}
 
 						if (tagStack > RecursionLimit)
@@ -1439,7 +1474,7 @@ public static class MfmParser
 				return;
 			}
 
-			accumulator(ref state, end);
+			accumulator(ref state, end, recursionInfo);
 
 			if (seekToEnd)
 				state.SeekTo(end + closeTagLength);
