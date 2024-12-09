@@ -1,9 +1,10 @@
 using System.Buffers;
+using System.Runtime.InteropServices;
 using JetBrains.Annotations;
 
 namespace Iceshrimp.MfmSharp;
 
-using RecursionInfo = Dictionary<string, ((int idx, bool open)[] lut, int pointer)>;
+using RecursionInfo = Dictionary<string, MfmParser.ParserState.RecursionInfoEntry>;
 
 [PublicAPI]
 public static class MfmParser
@@ -85,8 +86,9 @@ public static class MfmParser
 		public bool IsLast      => _position == LastIdx;
 		public bool IsStart     => _position == 0;
 
-		public ParseMode     Mode          => mode;
-		public RecursionInfo RecursionInfo => _recursionInfo ??= BuildRecursionInfo();
+		public ReadOnlySpan<char> Stream        => _stream;
+		public ParseMode          Mode          => mode;
+		public RecursionInfo      RecursionInfo => _recursionInfo ??= BuildRecursionInfo();
 
 		public SearchValues<char> BoundaryChars => mode switch
 		{
@@ -415,10 +417,23 @@ public static class MfmParser
 
 		private static SearchValues<string> _allTagsSv = SearchValues.Create(_allTags, StringComparison.Ordinal);
 
+		[StructLayout(LayoutKind.Sequential)]
+		public struct RecursionInfoLutEntry
+		{
+			public bool Open;
+			public int  Idx;
+		}
+
+		public struct RecursionInfoEntry
+		{
+			public RecursionInfoLutEntry[] Lut;
+			public int                     Pointer;
+		}
+
 		public RecursionInfo BuildRecursionInfo()
 		{
-			var luts   = _openTags.ToDictionary(p => p, _ => new AutoResizeArray<(int idx, bool open)>());
-			var stacks = _openTags.ToDictionary(p => p, _ => 0);
+			var luts   = _openTags.ToDictionary(p => p, _ => new AutoResizeArray<RecursionInfoLutEntry>());
+			var offset = Offset;
 
 			var i      = -1;
 			var length = Length;
@@ -430,22 +445,22 @@ public static class MfmParser
 
 				i += next;
 
-				var (tag, diff) = _stream[i] switch
+				var (tag, open) = _stream[i] switch
 				{
-					'$' => ("$[", 1),
-					']' => ("$[", -1),
+					'$' => ("$[", true),
+					']' => ("$[", false),
 					'<' => _stream[i + 1] switch
 					{
-						'b' => ("<b>", 1),
-						'i' => ("<i>", 1),
-						'p' => ("<plain>", 1),
-						'c' => ("<center>", 1),
+						'b' => ("<b>", true),
+						'i' => ("<i>", true),
+						'p' => ("<plain>", true),
+						'c' => ("<center>", true),
 						's' => (_stream[i + 2] switch
 						{
 							'm' => "<small>",
 							'>' => "<s>",
 							_   => null
-						}, 1),
+						}, true),
 						'/' => (_stream[i + 2] switch
 						{
 							'b' => "<b>",
@@ -459,20 +474,20 @@ public static class MfmParser
 								_   => null
 							},
 							_ => null
-						}, -1),
-						_ => (null, 0)
+						}, false),
+						_ => (null, false)
 					},
-					_ => (null, 0)
+					_ => (null, false)
 				};
 
 				if (tag == null)
 					continue;
 
-				stacks[tag] += diff;
-				luts[tag]   =  luts[tag].Add((i + Offset, diff is 1));
+				luts[tag] = luts[tag].Add(new RecursionInfoLutEntry { Idx = i + offset, Open = open });
 			}
 
-			return _recursionInfo = _openTags.ToDictionary(p => p, p => (luts[p].AsArray(), 0));
+			return _recursionInfo =
+				_openTags.ToDictionary(p => p, p => new RecursionInfoEntry { Lut = luts[p].AsArray() });
 		}
 	}
 
@@ -613,42 +628,36 @@ public static class MfmParser
 	private static Parser ParseTilde(ParserState state)
 		=> state.MatchAhead("~~") ? ParseStrikeTilde : ParseText;
 
-	private static void ParseText(ref ParserState state)
-	{
-		// First, we find out how much text we can parse
-		var endIdx = state.IndexOfAnyBoundaryChar();
-
-		// No more boundary chars - we can consume the rest of the stream
-		if (endIdx == -1)
-		{
-			state.UpdatePendingTextAndSeekToEnd();
-			return;
-		}
-
-		if (state.Position == endIdx) endIdx++;
-		state.UpdatePendingTextAndSeekTo(endIdx);
-	}
+	private static void ParseText(ref ParserState state) => state.UpdatePendingTextAndSeekToBoundary();
 
 	private static Parser ParseInlineTag(ParserState state)
 	{
-		if (state.MatchAhead("<b>"))
-			return ParseBoldTag;
-		if (state.MatchAhead("<i>"))
-			return ParseItalicTag;
-		if (state.MatchAhead("<s>"))
-			return ParseStrikeTag;
-		if (state.MatchAhead("<plain>"))
-			return ParsePlainTag;
-		if (state.MatchAhead("<small>"))
-			return ParseSmallTag;
-		if (state.MatchAhead("<https://") || state.MatchAhead("<http://"))
-			return ParseUrlBrackets;
+		// shortest tag pair is 6 characters long
+		if (state.Remaining < 6) return ParseText;
 
-		return (ref ParserState s) => s.UpdatePendingTextAndSeekToBoundary();
+		var stream = state.Stream;
+		var pos    = state.Position;
+
+		return stream[pos + 1] switch
+		{
+			'b' when stream[pos + 2] is '>'        => ParseBoldTag,
+			'i' when stream[pos + 2] is '>'        => ParseItalicTag,
+			's' when stream[pos + 2] is '>'        => ParseStrikeTag,
+			's' when state.MatchAhead("<small>")   => ParseSmallTag,
+			'p' when state.MatchAhead("<plain>")   => ParsePlainTag,
+			'h' when state.MatchAhead("<http://")  => ParseUrlBrackets,
+			'h' when state.MatchAhead("<https://") => ParseUrlBrackets,
+			//
+			_ => ParseText
+		};
 	}
 
 	private static Parser ParseTag(ParserState state)
-		=> state.MatchAhead("<center>") ? ParseCenterTag : ParseInlineTag(state);
+		=> state.Remaining < 6
+			? ParseText
+			: state.Stream[state.Position + 1] == 'c' && state.MatchAhead("<center>")
+				? ParseCenterTag
+				: ParseInlineTag(state);
 
 	private static void ParseHashtag(ref ParserState state)
 	{
@@ -1449,20 +1458,26 @@ public static class MfmParser
 
 			if (allowNesting)
 			{
-				var info = state.RecursionInfo[openTag];
-				var (lut, startIdx) = info;
-				var offset         = state.Offset;
-				var pos            = state.Position + offset;
-				var until          = searchSpaceEnd + offset;
-				var closeTagLutIdx = Array.FindIndex(lut, startIdx, p => !p.open && p.idx >= pos && p.idx < until);
-				var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx].idx;
+				var info     = state.RecursionInfo[openTag];
+				var lut      = info.Lut.AsSpan();
+				var startIdx = info.Pointer;
+				var offset   = state.Offset;
+				var pos      = state.Position + offset;
+				var until    = searchSpaceEnd + offset;
 
-				var count         = closeTagIdx != -1 ? closeTagLutIdx - startIdx : lut.Length - startIdx;
-				var openTagLutIdx = Array.FindIndex(lut, startIdx, count, p => p.open && p.idx >= pos);
-				var openTagIdx    = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx].idx;
+				var closeTagLutIdx = lut.FindIndex(false, ++startIdx, null, pos, until);
+				var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx].Idx;
+
+				var openTagLutIdx = closeTagIdx - pos > openTagLength
+					? lut.FindIndex(true, startIdx, closeTagLutIdx, pos)
+					: -1;
+
+				var openTagIdx = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx].Idx;
 
 				if (openTagLutIdx != -1)
-					state.RecursionInfo[openTag] = info with { pointer = openTagLutIdx };
+					state.RecursionInfo[openTag] = info with { Pointer = openTagLutIdx };
+				else if (closeTagIdx != -1)
+					state.RecursionInfo[openTag] = info with { Pointer = closeTagLutIdx };
 
 				if (closeTagIdx != -1)
 				{
@@ -1477,19 +1492,19 @@ public static class MfmParser
 						var i = openTagLutIdx;
 						while (i < lut.Length)
 						{
-							if (lut[i].idx >= until)
+							if (lut[i].Idx >= until)
 								break;
 
-							tagStack += lut[i].open ? 1 : -1;
+							tagStack += lut[i].Open ? 1 : -1;
 
 							if (tagStack == 0)
 							{
-								end = lut[i].idx - offset;
+								end = lut[i].Idx - offset;
 								break;
 							}
 
-							if (!lut[i].open)
-								closeTagIdx = lut[i].idx - offset;
+							if (!lut[i].Open)
+								closeTagIdx = lut[i].Idx - offset;
 
 							i++;
 						}
