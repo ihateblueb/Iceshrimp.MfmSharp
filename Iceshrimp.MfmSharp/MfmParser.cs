@@ -270,7 +270,7 @@ public static class MfmParser
 			=> (matchStart && IsStart) || (!IsStart && MatchAnyBehind(WhitespaceChars));
 
 		public bool MatchNewlineBehind(bool matchStart)
-			=> (matchStart && IsStart) || (!IsStart && MatchBehind('\n'));
+			=> (matchStart && IsStart) || (!IsStart && PrevChar == '\n');
 
 		public ReadOnlySpan<char> ReadToEnd()             => _stream[_position..];
 		public ReadOnlySpan<char> ReadTo(int end)         => _stream[_position..end];
@@ -1023,7 +1023,7 @@ public static class MfmParser
 	{
 		const int quoteRecursionLimit = 4;
 
-		if (state.Remaining < 2 || !state.MatchNewlineBehind(true))
+		if (!state.MatchNewlineBehind(true) || state.Remaining < 2)
 		{
 			state.UpdatePendingTextAndSeekToBoundary();
 			return;
