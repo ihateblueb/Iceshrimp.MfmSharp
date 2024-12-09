@@ -292,13 +292,22 @@ public static class MfmParser
 		);
 
 		private int? Lookup(ref LookupEntry key)
-			=> (_lookupCache ??= []).TryGetValue(key, out var val) && val >= _position
-				? val
-				: val < 0
-					? val - (_offset ?? 0)
-					: null;
+		{
+			if (!(_lookupCache ??= []).TryGetValue(key, out var val))
+				return null;
+			if (val < 0)
+				return val;
+			val -= _offset ?? 0;
+			if (val >= _position)
+				return val;
+			return null;
+		}
 
-		private int SetLookup(ref LookupEntry key, int val) => (_lookupCache ??= [])[key] = val;
+		private int SetLookup(ref LookupEntry key, int val)
+		{
+			(_lookupCache ??= [])[key] = val < 0 ? val : val + (_offset ?? 0);
+			return val;
+		}
 
 		public int IndexOfAny(SearchValues<char> sv) => WithPosition(_stream[_position..].IndexOfAny(sv));
 
