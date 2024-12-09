@@ -4,8 +4,6 @@ using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoEntry;
 
 namespace Iceshrimp.MfmSharp;
 
-using RecursionInfo = Dictionary<string, MfmParser.ParserState.RecursionInfoEntry>;
-
 [PublicAPI]
 public static class MfmParser
 {
@@ -68,10 +66,11 @@ public static class MfmParser
 		private AutoResizeArray<IMfmInlineNode> _recurseResults = new();
 
 		// Cache for (possibly) expensive lookups
-		private Dictionary<LookupEntry, int>? _lookupCache   = null;
-		private HashSet<string>?              _unmatchedTags = null;
-		private RecursionInfo?                _recursionInfo = null;
-		private int?                          _offset        = null;
+		private Dictionary<LookupEntry, int>? _lookupCache      = null;
+		private HashSet<string>?              _unmatchedTags    = null;
+		private MaterializedRecursionInfo     _recursionInfo    = default;
+		private bool                          _recursionInfoSet = false;
+		private int?                          _offset           = null;
 
 		// Helper expression-bodied properties
 		public int  Position    => _position;
@@ -86,9 +85,19 @@ public static class MfmParser
 		public bool IsLast      => _position == LastIdx;
 		public bool IsStart     => _position == 0;
 
-		public ReadOnlySpan<char> Stream        => _stream;
-		public ParseMode          Mode          => mode;
-		public RecursionInfo      RecursionInfo => _recursionInfo ??= BuildRecursionInfo();
+		public ReadOnlySpan<char> Stream => _stream;
+		public ParseMode          Mode   => mode;
+
+		public MaterializedRecursionInfo RecursionInfo
+		{
+			get
+			{
+				if (_recursionInfoSet)
+					return _recursionInfo;
+				_recursionInfoSet = true;
+				return _recursionInfo = BuildRecursionInfo();
+			}
+		}
 
 		public SearchValues<char> BoundaryChars => mode switch
 		{
@@ -133,11 +142,12 @@ public static class MfmParser
 
 			var state = new ParserState(stream, ParseMode.Inline)
 			{
-				_depth         = _depth + 1,
-				_offset        = _position + (_offset ?? 0),
-				_lookupCache   = _lookupCache,
-				_unmatchedTags = _unmatchedTags,
-				_recursionInfo = _recursionInfo
+				_depth            = _depth + 1,
+				_offset           = _position + (_offset ?? 0),
+				_lookupCache      = _lookupCache,
+				_unmatchedTags    = _unmatchedTags,
+				_recursionInfo    = _recursionInfo,
+				_recursionInfoSet = _recursionInfoSet
 			};
 
 			while (!state.IsEos)
@@ -423,25 +433,35 @@ public static class MfmParser
 		private static string[] _openTags  = ["$[", "<b>", "<i>", "<s>", "<plain>", "<small>", "<center>"];
 		private static string[] _closeTags = ["]", "</b>", "</i>", "</s>", "</plain>", "</small>", "</center>"];
 		private static string[] _allTags   = [.._openTags, .._closeTags];
+		private static int      _tagCount  = _openTags.Length;
+
+		public static int GetOpenTagIdx(string tag) => Array.IndexOf(_openTags, tag);
 
 		private static SearchValues<string> _allTagsSv = SearchValues.Create(_allTags, StringComparison.Ordinal);
 
-		public struct RecursionInfoEntry
-		{
-			public int[] Lut;
-			public int   Pointer;
+		private static AutoResizeArray<int>[]
+			_emptyLutMap = _openTags.Select(_ => AutoResizeArray<int>.Default).ToArray();
 
+		public static class RecursionInfoEntry
+		{
 			public const int OpenBitIdx   = 17;
 			public const int OpenBitmask  = 1 << OpenBitIdx;
 			public const int IndexBitmask = ~(1 << OpenBitIdx);
 
-			public const int OpenFlag = 1 << OpenBitIdx;
+			public const int OpenFlag  = 1 << OpenBitIdx;
 			public const int CloseFlag = 0;
 		}
 
-		public RecursionInfo BuildRecursionInfo()
+		public ref struct MaterializedRecursionInfo
 		{
-			var luts   = _openTags.ToDictionary(p => p, _ => new AutoResizeArray<int>());
+			public Span<AutoResizeArray<int>> Luts;
+			public Span<int>                  Pointers;
+		}
+
+		public MaterializedRecursionInfo BuildRecursionInfo()
+		{
+			var luts = new AutoResizeArray<int>[_tagCount].AsSpan();
+			_emptyLutMap.CopyTo(luts);
 			var offset = Offset;
 
 			var i      = -1;
@@ -454,49 +474,45 @@ public static class MfmParser
 
 				i += next;
 
-				var (tag, open) = _stream[i] switch
+				var (tagIdx, open) = _stream[i] switch
 				{
-					'$' => ("$[", 1),
-					']' => ("$[", 0),
+					'$' => (0, 1), // $[
+					']' => (0, 0), // $[
 					'<' => _stream[i + 1] switch
 					{
-						'b' => ("<b>", 1),
-						'i' => ("<i>", 1),
-						'p' => ("<plain>", 1),
-						'c' => ("<center>", 1),
+						'b' => (1, 1), // <b>
+						'i' => (2, 1), // <i>
+						'p' => (4, 1), // <plain>
+						'c' => (6, 1), // <center>
 						's' => (_stream[i + 2] switch
 						{
-							'm' => "<small>",
-							'>' => "<s>",
-							_   => null
+							'm' => 5, // <small>
+							'>' => 3, // <s>
+							_   => -1
 						}, 1),
 						'/' => (_stream[i + 2] switch
 						{
-							'b' => "<b>",
-							'i' => "<i>",
-							'p' => "<plain>",
-							'c' => "<center>",
+							'b' => 1, // </b>
+							'i' => 2, // </i>
+							'p' => 4, // </plain>
+							'c' => 6, // </center>
 							's' => _stream[i + 3] switch
 							{
-								'm' => "<small>",
-								'>' => "<s>",
-								_   => null
+								'm' => 5, // </small>
+								'>' => 3, // </s>
+								_   => -1
 							},
-							_ => null
+							_ => -1
 						}, 0),
-						_ => (null, 0)
+						_ => (-1, 0)
 					},
-					_ => (null, 0)
+					_ => (-1, 0)
 				};
 
-				if (tag == null)
-					continue;
-
-				luts[tag] = luts[tag].Add((i + offset) | open << OpenBitIdx);
+				luts[tagIdx].Add((i + offset) | open << OpenBitIdx);
 			}
 
-			return _recursionInfo =
-				_openTags.ToDictionary(p => p, p => new RecursionInfoEntry { Lut = luts[p].AsArray() });
+			return new MaterializedRecursionInfo { Luts = luts, Pointers = new int[_tagCount] };
 		}
 	}
 
@@ -1435,6 +1451,7 @@ public static class MfmParser
 		int consumeMaxTrailingNewlines = 0
 	)
 	{
+		var openTagInfoIdx = ParserState.GetOpenTagIdx(openTag);
 		var openTagLength  = openTag.Length;
 		var closeTagLength = closeTag.Length;
 
@@ -1467,9 +1484,9 @@ public static class MfmParser
 
 			if (allowNesting)
 			{
-				var info     = state.RecursionInfo[openTag];
-				var lut      = info.Lut.AsSpan();
-				var startIdx = info.Pointer;
+				var info     = state.RecursionInfo.Luts[openTagInfoIdx];
+				var lut      = info.AsSpan();
+				var startIdx = state.RecursionInfo.Pointers[openTagInfoIdx];
 				var offset   = state.Offset;
 				var pos      = state.Position + offset;
 				var until    = searchSpaceEnd + offset;
@@ -1484,9 +1501,9 @@ public static class MfmParser
 				var openTagIdx = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx] & IndexBitmask;
 
 				if (openTagLutIdx != -1)
-					state.RecursionInfo[openTag] = info with { Pointer = openTagLutIdx };
+					state.RecursionInfo.Pointers[openTagInfoIdx] = openTagLutIdx;
 				else if (closeTagIdx != -1)
-					state.RecursionInfo[openTag] = info with { Pointer = closeTagLutIdx };
+					state.RecursionInfo.Pointers[openTagInfoIdx] = closeTagLutIdx;
 
 				if (closeTagIdx != -1)
 				{

@@ -11,6 +11,8 @@ public struct AutoResizeArray<T>(T[] existing)
 {
 	public AutoResizeArray() : this(EmptyArray) { }
 
+	public static readonly AutoResizeArray<T> Default = new([]);
+
 	private T[] _array = existing;
 	private int _size  = existing.Length;
 	public  int Count => _size;
@@ -64,13 +66,17 @@ public struct AutoResizeArray<T>(T[] existing)
 		return this;
 	}
 
-	public T[] AsArray() => _size > 1000
+	public T[] AsArray(bool force = false) => !force && _size > 1000
 		? ToArray() // Benchmarks say this is faster, why is beyond me
 		: _array.Length == _size
 			? _array
 			: _array[.._size];
 
 	public T[] ToArray() => _size == _array.Length ? _array.AsSpan().ToArray() : _array[.._size].AsSpan().ToArray();
+
+	public void Trim() => Capacity = _size;
+
+	public Span<T> AsSpan() => _array.AsSpan()[.._size];
 
 	public T this[int index]
 	{
