@@ -1,6 +1,6 @@
 using System.Buffers;
-using System.Runtime.InteropServices;
 using JetBrains.Annotations;
+using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoEntry;
 
 namespace Iceshrimp.MfmSharp;
 
@@ -426,22 +426,22 @@ public static class MfmParser
 
 		private static SearchValues<string> _allTagsSv = SearchValues.Create(_allTags, StringComparison.Ordinal);
 
-		[StructLayout(LayoutKind.Sequential)]
-		public struct RecursionInfoLutEntry
-		{
-			public bool Open;
-			public int  Idx;
-		}
-
 		public struct RecursionInfoEntry
 		{
-			public RecursionInfoLutEntry[] Lut;
-			public int                     Pointer;
+			public int[] Lut;
+			public int   Pointer;
+
+			public const int OpenBitIdx   = 17;
+			public const int OpenBitmask  = 1 << OpenBitIdx;
+			public const int IndexBitmask = ~(1 << OpenBitIdx);
+
+			public const int OpenFlag = 1 << OpenBitIdx;
+			public const int CloseFlag = 0;
 		}
 
 		public RecursionInfo BuildRecursionInfo()
 		{
-			var luts   = _openTags.ToDictionary(p => p, _ => new AutoResizeArray<RecursionInfoLutEntry>());
+			var luts   = _openTags.ToDictionary(p => p, _ => new AutoResizeArray<int>());
 			var offset = Offset;
 
 			var i      = -1;
@@ -456,20 +456,20 @@ public static class MfmParser
 
 				var (tag, open) = _stream[i] switch
 				{
-					'$' => ("$[", true),
-					']' => ("$[", false),
+					'$' => ("$[", 1),
+					']' => ("$[", 0),
 					'<' => _stream[i + 1] switch
 					{
-						'b' => ("<b>", true),
-						'i' => ("<i>", true),
-						'p' => ("<plain>", true),
-						'c' => ("<center>", true),
+						'b' => ("<b>", 1),
+						'i' => ("<i>", 1),
+						'p' => ("<plain>", 1),
+						'c' => ("<center>", 1),
 						's' => (_stream[i + 2] switch
 						{
 							'm' => "<small>",
 							'>' => "<s>",
 							_   => null
-						}, true),
+						}, 1),
 						'/' => (_stream[i + 2] switch
 						{
 							'b' => "<b>",
@@ -483,16 +483,16 @@ public static class MfmParser
 								_   => null
 							},
 							_ => null
-						}, false),
-						_ => (null, false)
+						}, 0),
+						_ => (null, 0)
 					},
-					_ => (null, false)
+					_ => (null, 0)
 				};
 
 				if (tag == null)
 					continue;
 
-				luts[tag] = luts[tag].Add(new RecursionInfoLutEntry { Idx = i + offset, Open = open });
+				luts[tag] = luts[tag].Add((i + offset) | open << OpenBitIdx);
 			}
 
 			return _recursionInfo =
@@ -1474,14 +1474,14 @@ public static class MfmParser
 				var pos      = state.Position + offset;
 				var until    = searchSpaceEnd + offset;
 
-				var closeTagLutIdx = lut.FindIndex(false, ++startIdx, null, pos, until);
-				var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx].Idx;
+				var closeTagLutIdx = lut.FindIndex(CloseFlag, ++startIdx, null, pos, until);
+				var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx] & IndexBitmask;
 
 				var openTagLutIdx = closeTagIdx - pos > openTagLength
-					? lut.FindIndex(true, startIdx, closeTagLutIdx, pos)
+					? lut.FindIndex(OpenFlag, startIdx, closeTagLutIdx, pos)
 					: -1;
 
-				var openTagIdx = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx].Idx;
+				var openTagIdx = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx] & IndexBitmask;
 
 				if (openTagLutIdx != -1)
 					state.RecursionInfo[openTag] = info with { Pointer = openTagLutIdx };
@@ -1501,19 +1501,22 @@ public static class MfmParser
 						var i = openTagLutIdx;
 						while (i < lut.Length)
 						{
-							if (lut[i].Idx >= until)
+							var candidate    = lut[i];
+							var candidateIdx = candidate & IndexBitmask;
+							if (candidateIdx >= until)
 								break;
 
-							tagStack += lut[i].Open ? 1 : -1;
+							var candidateOpen = (candidate & OpenBitmask) is OpenFlag;
+							tagStack += candidateOpen ? 1 : -1;
 
 							if (tagStack == 0)
 							{
-								end = lut[i].Idx - offset;
+								end = candidateIdx - offset;
 								break;
 							}
 
-							if (!lut[i].Open)
-								closeTagIdx = lut[i].Idx - offset;
+							if (!candidateOpen)
+								closeTagIdx = candidateIdx - offset;
 
 							i++;
 						}

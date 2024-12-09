@@ -1,4 +1,4 @@
-using static Iceshrimp.MfmSharp.MfmParser.ParserState;
+using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoEntry;
 
 namespace Iceshrimp.MfmSharp;
 
@@ -6,7 +6,7 @@ internal static class ArrayExtensions
 {
 	//TODO: custom binary search?
 	public static int FindIndex(
-		this Span<RecursionInfoLutEntry> lut, bool open,
+		this Span<int> lut, int flag,
 		int lutIdxRangeStart, int? lutIdxRangeEnd,
 		int resIdxRangeStart, int? resIdxRangeEnd = null
 	)
@@ -17,14 +17,15 @@ internal static class ArrayExtensions
 
 		for (var i = lutIdxRangeStart; i < lutIdxRangeEnd; i++)
 		{
-			var candidate = lut[i];
-			if (resIdxRangeEnd != null && candidate.Idx >= resIdxRangeEnd)
+			var candidate    = lut[i];
+			var candidateIdx = candidate & IndexBitmask;
+			if (candidateIdx >= resIdxRangeEnd)
 				break;
 
-			if (candidate.Idx < resIdxRangeStart)
+			if (candidateIdx < resIdxRangeStart)
 				continue;
 
-			if (candidate.Open != open)
+			if ((candidate & OpenBitmask) != flag)
 				continue;
 
 			return i;
