@@ -1200,7 +1200,7 @@ public static class MfmParser
 	private static Parser ParseCodeBlockOrInlineCode(ParserState state)
 		=> state.IsStart && state.MatchAhead("```") ? ParseCodeBlock : ParseInlineCode;
 
-	private static readonly Accumulator ItalicAccumulator = (ref ParserState state, int endIdx) =>
+	private static void ItalicAccumulator(ref ParserState state, int endIdx)
 	{
 		var type = state.PrevChar switch
 		{
@@ -1210,9 +1210,9 @@ public static class MfmParser
 		};
 
 		state.AddInlineResult(new MfmItalicNode(state.Recurse(endIdx), type));
-	};
+	}
 
-	private static readonly Accumulator BoldAccumulator = (ref ParserState state, int endIdx) =>
+	private static void BoldAccumulator(ref ParserState state, int endIdx)
 	{
 		var type = state.PrevChar switch
 		{
@@ -1222,9 +1222,9 @@ public static class MfmParser
 		};
 
 		state.AddInlineResult(new MfmBoldNode(state.Recurse(endIdx), type));
-	};
+	}
 
-	private static readonly Accumulator StrikeAccumulator = (ref ParserState state, int endIdx) =>
+	private static void StrikeAccumulator(ref ParserState state, int endIdx)
 	{
 		var type = state.PrevChar switch
 		{
@@ -1233,15 +1233,15 @@ public static class MfmParser
 		};
 
 		state.AddInlineResult(new MfmStrikeNode(state.Recurse(endIdx), type));
-	};
+	}
 
-	private static readonly Accumulator InlineMathAccumulator = (ref ParserState state, int endIdx)
+	private static void InlineMathAccumulator(ref ParserState state, int endIdx)
 		=> state.AddInlineResult(new MfmInlineMathNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator MathBlockAccumulator = (ref ParserState state, int endIdx)
+	private static void MathBlockAccumulator(ref ParserState state, int endIdx)
 		=> state.AddBlockResult(new MfmMathBlockNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator CodeBlockAccumulator = (ref ParserState state, int endIdx) =>
+	private static void CodeBlockAccumulator(ref ParserState state, int endIdx)
 	{
 		if (endIdx == state.Position)
 			return;
@@ -1259,9 +1259,9 @@ public static class MfmParser
 
 		state.Seek(1);
 		state.AddBlockResult(new MfmCodeBlockNode(state.ReadTo(endIdx).ToString(), lang));
-	};
+	}
 
-	private static readonly Accumulator CenterAccumulator = (ref ParserState state, int endIdx) =>
+	private static void CenterAccumulator(ref ParserState state, int endIdx)
 	{
 		if (state.CurrentChar == '\n' && state.Position < endIdx)
 			state.Seek(1);
@@ -1269,15 +1269,15 @@ public static class MfmParser
 			endIdx--;
 
 		state.AddBlockResult(new MfmCenterNode(state.Recurse(endIdx)));
-	};
+	}
 
-	private static readonly Accumulator SmallAccumulator = (ref ParserState state, int endIdx)
+	private static void SmallAccumulator(ref ParserState state, int endIdx)
 		=> state.AddInlineResult(new MfmSmallNode(state.Recurse(endIdx)));
 
-	private static readonly Accumulator PlainAccumulator = (ref ParserState state, int endIdx)
+	private static void PlainAccumulator(ref ParserState state, int endIdx)
 		=> state.AddInlineResult(new MfmPlainNode(state.ReadTo(endIdx).ToString()));
 
-	private static readonly Accumulator FnAccumulator = (ref ParserState state, int endIdx) =>
+	private static void FnAccumulator(ref ParserState state, int endIdx)
 	{
 		var descriptorEndIdx = state.IndexOf(' ', endIdx);
 		if (descriptorEndIdx == -1 || endIdx - descriptorEndIdx <= 1)
@@ -1355,7 +1355,7 @@ public static class MfmParser
 		state.AddInlineResult(new MfmFnNode(name.ToString(), args, state.Recurse(endIdx)));
 		state.SeekTo(endIdx);
 		state.Seek(1);
-	};
+	}
 
 	private static readonly Parser ParseItalicAsterisk   = GetMarkupNode('*', "**", ItalicAccumulator);
 	private static readonly Parser ParseItalicUnderscore = GetMarkupNode('_', "__", ItalicAccumulator);
