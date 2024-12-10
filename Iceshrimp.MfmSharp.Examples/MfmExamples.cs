@@ -101,6 +101,13 @@ public static class MfmExamples
 		while (sb.Length < Limit - "*<b>*".Length) sb.Append("*<b>*");
 		return sb.ToString();
 	}
+	
+	public static string UnmatchedBoldNodeManyNestedPadded()
+	{
+		var sb = new StringBuilder();
+		while (sb.Length < Limit - "*<b>* ".Length) sb.Append("*<b>* ");
+		return sb.ToString();
+	}
 
 	public static string UnmatchedBoldNodeManyQuoted()
 	{
