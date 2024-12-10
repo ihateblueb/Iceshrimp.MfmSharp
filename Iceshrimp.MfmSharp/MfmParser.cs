@@ -436,7 +436,7 @@ public static class MfmParser
 		private static string[] _allTags   = [.._openTags, .._closeTags];
 		private static int      _tagCount  = _openTags.Length;
 
-		public static int GetOpenTagIdx(string tag) => Array.IndexOf(_openTags, tag);
+		public static ushort GetOpenTagIdx(string tag) => (ushort)_openTags.AsSpan().IndexOf(tag);
 
 		private static SearchValues<string> _allTagsSv = SearchValues.Create(_allTags, StringComparison.Ordinal);
 
@@ -626,7 +626,7 @@ public static class MfmParser
 		if (state.IsEos) return;
 		var position = state.Position;
 
-		var parser = state.CurrentChar switch
+		Parser parser = state.CurrentChar switch
 		{
 			':'                                  => ParseEmojiCode,
 			'<' when state.MatchAhead("<plain>") => ParsePlainTag,
@@ -1357,228 +1357,271 @@ public static class MfmParser
 		state.Seek(1);
 	}
 
-	private static readonly Parser ParseItalicAsterisk   = GetMarkupNode('*', "**", ItalicAccumulator);
-	private static readonly Parser ParseItalicUnderscore = GetMarkupNode('_', "__", ItalicAccumulator);
-	private static readonly Parser ParseBoldAsterisk     = GetMarkupNode("**", BoldAccumulator);
-	private static readonly Parser ParseBoldUnderscore   = GetMarkupNode("__", BoldAccumulator);
-	private static readonly Parser ParseStrikeTilde      = GetMarkupNode("~~", StrikeAccumulator);
+	private static MarkupChar   _italicAsterisk   = new('*', "**", ItalicAccumulator);
+	private static MarkupChar   _italicUnderscore = new('_', "__", ItalicAccumulator);
+	private static MarkupString _boldAsterisk     = new("**", BoldAccumulator);
+	private static MarkupString _boldUnderscore   = new("__", BoldAccumulator);
+	private static MarkupString _strikeTilde      = new("~~", StrikeAccumulator);
+	private static MarkupTag    _italicTag        = new("<i>", "</i>", ItalicAccumulator);
+	private static MarkupTag    _boldTag          = new("<b>", "</b>", BoldAccumulator);
+	private static MarkupTag    _strikeTag        = new("<s>", "</s>", StrikeAccumulator);
+	private static MarkupTag    _smallTag         = new("<small>", "</small>", SmallAccumulator);
+	private static MarkupTag    _fnTag            = new("$[", "]", FnAccumulator, seekToEnd: false);
+	private static MarkupTag    _plainTag         = new("<plain>", "</plain>", PlainAccumulator, allowNesting: false);
 
-	private static readonly Parser ParseItalicTag = GetMarkupTagNode("<i>", "</i>", ItalicAccumulator);
-	private static readonly Parser ParseBoldTag   = GetMarkupTagNode("<b>", "</b>", BoldAccumulator);
-	private static readonly Parser ParseStrikeTag = GetMarkupTagNode("<s>", "</s>", StrikeAccumulator);
-	private static readonly Parser ParseSmallTag  = GetMarkupTagNode("<small>", "</small>", SmallAccumulator);
+	private static MarkupTag _centerTag =
+		new("<center>", "</center>", CenterAccumulator, requireStartOfLine: true);
 
-	private static readonly Parser ParseFnTag =
-		GetMarkupTagNode("$[", "]", FnAccumulator, seekToEnd: false);
+	private static MarkupTag _inlineMathTag =
+		new("\\(", "\\)", InlineMathAccumulator, sameLine: true, allowNesting: false);
 
-	private static readonly Parser ParsePlainTag =
-		GetMarkupTagNode("<plain>", "</plain>", PlainAccumulator, allowNesting: false);
+	private static MarkupTag _mathBlockTag =
+		new("\\[", "\\]", MathBlockAccumulator, allowNesting: false, requireStartOfLine: true);
 
-	private static readonly Parser ParseCenterTag =
-		GetMarkupTagNode("<center>", "</center>", CenterAccumulator, requireStartOfLine: true);
+	private static MarkupTag _codeBlockTag =
+		new("```", "\n```", CodeBlockAccumulator, allowNesting: false, consumeMaxLeadingNewlines: 2);
 
-	private static readonly Parser ParseInlineMath =
-		GetMarkupTagNode("\\(", "\\)", InlineMathAccumulator, sameLine: true, allowNesting: false);
+	// @formatter:off
+	private static void ParseItalicAsterisk(ref ParserState state)   => ParseMarkupNode(ref state, ref _italicAsterisk);
+	private static void ParseItalicUnderscore(ref ParserState state) => ParseMarkupNode(ref state, ref _italicUnderscore);
+	private static void ParseBoldAsterisk(ref ParserState state)     => ParseMarkupNode(ref state, ref _boldAsterisk);
+	private static void ParseBoldUnderscore(ref ParserState state)   => ParseMarkupNode(ref state, ref _boldUnderscore);
+	private static void ParseStrikeTilde(ref ParserState state)      => ParseMarkupNode(ref state, ref _strikeTilde);
+	private static void ParseItalicTag(ref ParserState state)        => ParseMarkupNode(ref state, ref _italicTag);
+	private static void ParseBoldTag(ref ParserState state)          => ParseMarkupNode(ref state, ref _boldTag);
+	private static void ParseStrikeTag(ref ParserState state)        => ParseMarkupNode(ref state, ref _strikeTag);
+	private static void ParseSmallTag(ref ParserState state)         => ParseMarkupNode(ref state, ref _smallTag);
+	private static void ParseFnTag(ref ParserState state)            => ParseMarkupNode(ref state, ref _fnTag);
+	private static void ParsePlainTag(ref ParserState state)         => ParseMarkupNode(ref state, ref _plainTag);
+	private static void ParseCenterTag(ref ParserState state)        => ParseMarkupNode(ref state, ref _centerTag);
+	private static void ParseInlineMath(ref ParserState state)       => ParseMarkupNode(ref state, ref _inlineMathTag);
+	private static void ParseMathBlock(ref ParserState state)        => ParseMarkupNode(ref state, ref _mathBlockTag);
+	private static void ParseCodeBlock(ref ParserState state)        => ParseMarkupNode(ref state, ref _codeBlockTag);
+	// @formatter:on
 
-	private static readonly Parser ParseMathBlock =
-		GetMarkupTagNode("\\[", "\\]", MathBlockAccumulator, allowNesting: false, requireStartOfLine: true);
+	#region MarkupNode Helpers
 
-	private static readonly Parser ParseCodeBlock =
-		GetMarkupTagNode("```", "\n```", CodeBlockAccumulator, allowNesting: false, consumeMaxLeadingNewlines: 2);
-
-	#region MarkupNode Closures
-
-	private static Parser GetMarkupNode(
-		char delim, string except, Accumulator accumulator, bool sameLine = true
+	private readonly struct MarkupChar(
+		char delim,
+		string except,
+		Accumulator accumulator,
+		bool sameLine = true
 	)
+	{
+		public readonly char        Delim      = delim;
+		public readonly string      Except     = except;
+		public readonly Accumulator Accumulate = accumulator;
+		public readonly bool        SameLine   = sameLine;
+	}
+
+	private static void ParseMarkupNode(ref ParserState state, ref MarkupChar desc)
 	{
 		const int delimLength = 1;
-		return (ref ParserState state) =>
+		state.Seek(delimLength);
+
+		var endIdx =
+			state.IndexOfExcept(desc.Delim, desc.Except, desc.SameLine ? state.IndexOfOrNullCached('\n') : null);
+
+		if (
+			endIdx == -1
+			|| (state.Position > delimLength
+			    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(state.Position - delimLength - 1)))
+			|| (endIdx < state.Length - delimLength
+			    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(endIdx + delimLength)))
+		)
 		{
-			state.Seek(delimLength);
+			state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
+			return;
+		}
 
-			var endIdx = state.IndexOfExcept(delim, except, sameLine ? state.IndexOfOrNullCached('\n') : null);
-
-			if (
-				endIdx == -1
-				|| (state.Position > delimLength
-				    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(state.Position - delimLength - 1)))
-				|| (endIdx < state.Length - delimLength
-				    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(endIdx + delimLength)))
-			)
-			{
-				state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-				return;
-			}
-
-			accumulator(ref state, endIdx);
-			state.SeekTo(endIdx + delimLength);
-		};
+		desc.Accumulate(ref state, endIdx);
+		state.SeekTo(endIdx + delimLength);
 	}
 
-	private static Parser GetMarkupNode(
-		string delim, Accumulator accumulator, bool sameLine = true
+	private readonly struct MarkupString(string delim, Accumulator accumulator, bool sameLine = true)
+	{
+		public readonly string      Delim       = delim;
+		public readonly Accumulator Accumulate  = accumulator;
+		public readonly ushort      DelimLength = (ushort)delim.Length;
+		public readonly bool        SameLine    = sameLine;
+	}
+
+	private static void ParseMarkupNode(ref ParserState state, ref MarkupString desc)
+	{
+		state.Seek(desc.DelimLength);
+
+		var endIdx = desc.SameLine
+			? state.IndexOf(desc.Delim, state.IndexOfOrNullCached('\n') ?? state.Length)
+			: state.IndexOf(desc.Delim);
+
+		if (
+			endIdx == -1
+			|| (state.Position > desc.DelimLength
+			    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(state.Position - desc.DelimLength - 1)))
+			|| (endIdx < state.Length - desc.DelimLength
+			    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(endIdx + desc.DelimLength)))
+		)
+		{
+			state.UpdatePendingTextBehindAndSeekToBoundary(desc.DelimLength);
+			return;
+		}
+
+		desc.Accumulate(ref state, endIdx);
+		state.SeekTo(endIdx + desc.DelimLength);
+	}
+
+	private readonly struct MarkupTag(
+		string openTag,
+		string closeTag,
+		Accumulator accumulator,
+		bool sameLine = false,
+		bool seekToEnd = true,
+		bool allowNesting = true,
+		bool requireStartOfLine = false,
+		ushort consumeMaxLeadingNewlines = 0,
+		ushort consumeMaxTrailingNewlines = 0
 	)
 	{
-		var delimLength = delim.Length;
-		return (ref ParserState state) =>
-		{
-			state.Seek(delimLength);
+		public readonly string      CloseTag   = closeTag;
+		public readonly Accumulator Accumulate = accumulator;
 
-			var endIdx = sameLine
-				? state.IndexOf(delim, state.IndexOfOrNullCached('\n') ?? state.Length)
-				: state.IndexOf(delim);
+		public readonly ushort OpenTagLength  = (ushort)openTag.Length;
+		public readonly ushort CloseTagLength = (ushort)closeTag.Length;
+		public readonly ushort OpenTagInfoIdx = ParserState.GetOpenTagIdx(openTag);
 
-			if (
-				endIdx == -1
-				|| (state.Position > delimLength
-				    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(state.Position - delimLength - 1)))
-				|| (endIdx < state.Length - delimLength
-				    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(endIdx + delimLength)))
-			)
-			{
-				state.UpdatePendingTextBehindAndSeekToBoundary(delimLength);
-				return;
-			}
+		public readonly bool SameLine           = sameLine;
+		public readonly bool SeekToEnd          = seekToEnd;
+		public readonly bool AllowNesting       = allowNesting;
+		public readonly bool RequireStartOfLine = requireStartOfLine;
 
-			accumulator(ref state, endIdx);
-			state.SeekTo(endIdx + delimLength);
-		};
+		public readonly ushort ConsumeMaxLeadingNewlines  = consumeMaxLeadingNewlines;
+		public readonly ushort ConsumeMaxTrailingNewlines = consumeMaxTrailingNewlines;
 	}
 
-	private static Parser GetMarkupTagNode(
-		string openTag, string closeTag, Accumulator accumulator, bool sameLine = false, bool seekToEnd = true,
-		bool allowNesting = true, bool requireStartOfLine = false, int consumeMaxLeadingNewlines = 0,
-		int consumeMaxTrailingNewlines = 0
-	)
+	private static void ParseMarkupNode(ref ParserState state, ref MarkupTag tag)
 	{
-		var openTagInfoIdx = ParserState.GetOpenTagIdx(openTag);
-		var openTagLength  = openTag.Length;
-		var closeTagLength = closeTag.Length;
-
-		return (ref ParserState state) =>
+		if (state.HasUnmatchedTag(tag.CloseTag) || (tag.RequireStartOfLine && !state.MatchNewlineBehind(true)))
 		{
-			if (state.HasUnmatchedTag(closeTag) || (requireStartOfLine && !state.MatchNewlineBehind(true)))
-			{
-				state.UpdatePendingTextAndSeekToBoundary();
-				return;
-			}
+			state.UpdatePendingTextAndSeekToBoundary();
+			return;
+		}
 
-			var consumedNewlines = 0;
-			if (consumeMaxLeadingNewlines > 0)
+		var consumedNewlines          = 0;
+		var consumeMaxLeadingNewlines = tag.ConsumeMaxLeadingNewlines;
+		if (consumeMaxLeadingNewlines > 0)
+		{
+			while (consumeMaxLeadingNewlines > 0 && state.MatchAhead('\n'))
 			{
-				while (consumeMaxLeadingNewlines > 0 && state.MatchAhead('\n'))
+				consumeMaxLeadingNewlines--;
+				consumedNewlines++;
+				state.Seek(1);
+			}
+		}
+
+		state.Seek(tag.OpenTagLength);
+
+		var end            = -1;
+		var searchSpaceEnd = tag.SameLine ? state.IndexOfCached('\n') : -1;
+
+		if (searchSpaceEnd == -1)
+			searchSpaceEnd = state.Length;
+
+		if (tag.AllowNesting)
+		{
+			var info     = state.RecursionInfo.Luts[tag.OpenTagInfoIdx];
+			var lut      = info.AsSpan();
+			var startIdx = state.RecursionInfo.Pointers[tag.OpenTagInfoIdx];
+			var offset   = state.Offset;
+			var pos      = state.Position + offset;
+			var until    = searchSpaceEnd + offset;
+
+			var closeTagLutIdx = lut.FindIndex(CloseFlag, ++startIdx, null, pos, until);
+			var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx] & IndexBitmask;
+
+			var openTagLutIdx = closeTagIdx - pos > tag.OpenTagLength
+				? lut.FindIndex(OpenFlag, startIdx, closeTagLutIdx, pos)
+				: -1;
+
+			var openTagIdx = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx] & IndexBitmask;
+
+			if (openTagLutIdx != -1)
+				state.RecursionInfo.Pointers[tag.OpenTagInfoIdx] = openTagLutIdx;
+			else if (closeTagLutIdx != -1)
+				state.RecursionInfo.Pointers[tag.OpenTagInfoIdx] = closeTagLutIdx;
+
+			if (closeTagIdx != -1)
+			{
+				if (openTagIdx == -1)
 				{
-					consumeMaxLeadingNewlines--;
-					consumedNewlines++;
-					state.Seek(1);
+					end = closeTagIdx - offset;
 				}
-			}
-
-			state.Seek(openTagLength);
-
-			var end            = -1;
-			var searchSpaceEnd = sameLine ? state.IndexOfCached('\n') : -1;
-
-			if (searchSpaceEnd == -1)
-				searchSpaceEnd = state.Length;
-
-			if (allowNesting)
-			{
-				var info     = state.RecursionInfo.Luts[openTagInfoIdx];
-				var lut      = info.AsSpan();
-				var startIdx = state.RecursionInfo.Pointers[openTagInfoIdx];
-				var offset   = state.Offset;
-				var pos      = state.Position + offset;
-				var until    = searchSpaceEnd + offset;
-
-				var closeTagLutIdx = lut.FindIndex(CloseFlag, ++startIdx, null, pos, until);
-				var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx] & IndexBitmask;
-
-				var openTagLutIdx = closeTagIdx - pos > openTagLength
-					? lut.FindIndex(OpenFlag, startIdx, closeTagLutIdx, pos)
-					: -1;
-
-				var openTagIdx = openTagLutIdx == -1 ? -1 : lut[openTagLutIdx] & IndexBitmask;
-
-				if (openTagLutIdx != -1)
-					state.RecursionInfo.Pointers[openTagInfoIdx] = openTagLutIdx;
-				else if (closeTagLutIdx != -1)
-					state.RecursionInfo.Pointers[openTagInfoIdx] = closeTagLutIdx;
-
-				if (closeTagIdx != -1)
+				else
 				{
-					if (openTagIdx == -1)
-					{
-						end = closeTagIdx - offset;
-					}
-					else
-					{
-						var tagStack = 1;
+					var tagStack = 1;
 
-						var i = openTagLutIdx;
-						while (i < lut.Length)
+					var i = openTagLutIdx;
+					while (i < lut.Length)
+					{
+						var candidate    = lut[i];
+						var candidateIdx = candidate & IndexBitmask;
+						if (candidateIdx >= until)
+							break;
+
+						var candidateOpen = (candidate & OpenBitmask) is OpenFlag;
+						tagStack += candidateOpen ? 1 : -1;
+
+						if (tagStack == 0)
 						{
-							var candidate    = lut[i];
-							var candidateIdx = candidate & IndexBitmask;
-							if (candidateIdx >= until)
-								break;
-
-							var candidateOpen = (candidate & OpenBitmask) is OpenFlag;
-							tagStack += candidateOpen ? 1 : -1;
-
-							if (tagStack == 0)
-							{
-								end = candidateIdx - offset;
-								break;
-							}
-
-							if (!candidateOpen)
-								closeTagIdx = candidateIdx - offset;
-
-							i++;
+							end = candidateIdx - offset;
+							break;
 						}
 
-						if (tagStack > RecursionLimit)
-						{
-							state.UpdatePendingTextAndSeekTo(searchSpaceEnd, openTagLength);
-							return;
-						}
+						if (!candidateOpen)
+							closeTagIdx = candidateIdx - offset;
 
-						if (tagStack > 0)
-							end = closeTagIdx;
+						i++;
 					}
+
+					if (tagStack > RecursionLimit)
+					{
+						state.UpdatePendingTextAndSeekTo(searchSpaceEnd, tag.OpenTagLength);
+						return;
+					}
+
+					if (tagStack > 0)
+						end = closeTagIdx;
 				}
 			}
-			else
+		}
+		else
+		{
+			var closeTagIdx = state.IndexOf(tag.CloseTag, searchSpaceEnd);
+			if (closeTagIdx != -1)
+				end = closeTagIdx;
+		}
+
+		if (end == -1)
+		{
+			state.UpdatePendingTextBehindAndSeekToBoundary(tag.OpenTagLength + consumedNewlines);
+			if (!tag.SameLine) state.AddUnmatchedTag(tag.CloseTag);
+			return;
+		}
+
+		tag.Accumulate(ref state, end);
+
+		if (tag.SeekToEnd)
+			state.SeekTo(end + tag.CloseTagLength);
+
+		var consumeMaxTrailingNewlines = tag.ConsumeMaxTrailingNewlines;
+		if (consumeMaxTrailingNewlines > 0)
+		{
+			while (consumeMaxTrailingNewlines > 0 && state.MatchAhead('\n'))
 			{
-				var closeTagIdx = state.IndexOf(closeTag, searchSpaceEnd);
-				if (closeTagIdx != -1)
-					end = closeTagIdx;
+				consumeMaxTrailingNewlines--;
+				state.Seek(1);
 			}
-
-			if (end == -1)
-			{
-				state.UpdatePendingTextBehindAndSeekToBoundary(openTagLength + consumedNewlines);
-				if (!sameLine) state.AddUnmatchedTag(closeTag);
-				return;
-			}
-
-			accumulator(ref state, end);
-
-			if (seekToEnd)
-				state.SeekTo(end + closeTagLength);
-
-			if (consumeMaxTrailingNewlines > 0)
-			{
-				while (consumeMaxTrailingNewlines > 0 && state.MatchAhead('\n'))
-				{
-					consumeMaxTrailingNewlines--;
-					state.Seek(1);
-				}
-			}
-		};
+		}
 	}
 
-	#endregion MarkupNode Closures
+	#endregion MarkupNode Helpers
 }
