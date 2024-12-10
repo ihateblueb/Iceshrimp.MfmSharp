@@ -117,7 +117,7 @@ public static class MfmExamples
 		return sb.ToString();
 	}
 
-	public static string UnmatchedBoldNodeManyNestedRepeating()
+	public static string MatchedBoldNodeManyNestedRepeating()
 	{
 		var sb  = new StringBuilder();
 		var sb2 = new StringBuilder();
