@@ -1502,7 +1502,7 @@ public static class MfmParser
 
 				if (openTagLutIdx != -1)
 					state.RecursionInfo.Pointers[openTagInfoIdx] = openTagLutIdx;
-				else if (closeTagIdx != -1)
+				else if (closeTagLutIdx != -1)
 					state.RecursionInfo.Pointers[openTagInfoIdx] = closeTagLutIdx;
 
 				if (closeTagIdx != -1)
