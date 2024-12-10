@@ -477,7 +477,7 @@ public static class MfmParser
 				var (tagIdx, open) = _stream[i] switch
 				{
 					'$' => (0, 1), // $[
-					']' => (0, 0), // $[
+					']' => (0, 0), // ]
 					'<' => _stream[i + 1] switch
 					{
 						'b' => (1, 1), // <b>
