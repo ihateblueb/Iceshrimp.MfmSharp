@@ -1,6 +1,7 @@
 using System.Buffers;
+using Iceshrimp.MfmSharp.Helpers;
 using JetBrains.Annotations;
-using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoEntry;
+using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoConstants;
 
 namespace Iceshrimp.MfmSharp;
 
@@ -442,7 +443,7 @@ public static class MfmParser
 		private static AutoResizeArray<int>[]
 			_emptyLutMap = _openTags.Select(_ => AutoResizeArray<int>.Default).ToArray();
 
-		public static class RecursionInfoEntry
+		public static class RecursionInfoConstants
 		{
 			public const int OpenBitIdx   = 17;
 			public const int OpenBitmask  = 1 << OpenBitIdx;

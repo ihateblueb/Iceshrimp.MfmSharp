@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 
-namespace Iceshrimp.MfmSharp;
+namespace Iceshrimp.MfmSharp.Helpers;
 
 /// <summary>
 /// Modified List&lt;T&gt; that can go on the stack 

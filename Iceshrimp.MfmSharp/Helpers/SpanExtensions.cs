@@ -1,8 +1,8 @@
-using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoEntry;
+using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoConstants;
 
-namespace Iceshrimp.MfmSharp;
+namespace Iceshrimp.MfmSharp.Helpers;
 
-internal static class ArrayExtensions
+internal static class SpanExtensions
 {
 	//TODO: custom binary search?
 	public static int FindIndex(
