@@ -102,7 +102,7 @@ public static class MfmParser
 			}
 		}
 
-		public SearchValues<char> BoundaryChars => mode switch
+		public SearchValues<char> BoundaryChars = mode switch
 		{
 			ParseMode.Full   => BoundaryCharsFull,
 			ParseMode.Inline => BoundaryCharsInline,
@@ -203,6 +203,7 @@ public static class MfmParser
 			UpdatePendingTextAndSeek(minChars);
 			if (IsEos) return;
 			var idx = IndexOfAnyBoundaryChar();
+			if (idx == _position) return;
 			if (idx == -1) UpdatePendingTextAndSeekToEnd();
 			else UpdatePendingTextAndSeekTo(idx);
 		}
