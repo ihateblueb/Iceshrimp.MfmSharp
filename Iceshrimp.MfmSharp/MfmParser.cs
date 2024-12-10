@@ -58,6 +58,8 @@ public static class MfmParser
 		private readonly ReadOnlySpan<char> _stream      = input;
 		private          bool               _closed      = false;
 		private          int                _position    = 0;
+		private          int                _length      = input.Length;
+		private          int                _lastIdx     = input.Length - 1;
 		private          int                _depth       = 0;
 		private          Range?             _pendingText = null;
 		private          bool               _skipLookup  = input.Length < LookupThreshold;
@@ -77,13 +79,13 @@ public static class MfmParser
 		public int  Position    => _position;
 		public int  Depth       => _depth;
 		public int  Offset      => _offset ?? 0;
-		public int  Length      => _stream.Length;
-		public int  Remaining   => Length - _position;
-		public int  LastIdx     => _stream.Length - 1;
+		public int  Length      => _length;
+		public int  Remaining   => _length - _position;
+		public int  LastIdx     => _lastIdx;
 		public char CurrentChar => _stream[_position];
 		public char PrevChar    => _stream[_position - 1];
-		public bool IsEos       => _position == Length;
-		public bool IsLast      => _position == LastIdx;
+		public bool IsEos       => _position == _length;
+		public bool IsLast      => _position == _lastIdx;
 		public bool IsStart     => _position == 0;
 
 		public ReadOnlySpan<char> Stream => _stream;
@@ -116,8 +118,8 @@ public static class MfmParser
 
 			_position += offset;
 
-			if (_position > _stream.Length)
-				_position = Length;
+			if (_position > _length)
+				_position = _length;
 		}
 
 		public void SeekTo(int dest)
@@ -125,10 +127,10 @@ public static class MfmParser
 			if (dest < _position)
 				throw new InvalidOperationException("Backtracking is not allowed");
 
-			_position = Math.Min(dest, Length);
+			_position = Math.Min(dest, _length);
 		}
 
-		public void SeekToEnd() => _position = Length;
+		public void SeekToEnd() => _position = _length;
 
 		// Recursion helper method
 		public IMfmInlineNode[] Recurse(int end)
@@ -207,7 +209,7 @@ public static class MfmParser
 
 		public void UpdatePendingTextAndSeekToEnd(int lookbehind = 0)
 		{
-			UpdatePendingText(Length, lookbehind);
+			UpdatePendingText(_length, lookbehind);
 			SeekToEnd();
 		}
 
@@ -260,13 +262,13 @@ public static class MfmParser
 			=> Remaining >= 1 && CurrentChar == match;
 
 		public bool MatchBehind(char match)
-			=> Position >= 1 && PrevChar == match;
+			=> _position >= 1 && PrevChar == match;
 
 		public bool MatchAhead(ReadOnlySpan<char> match)
-			=> Remaining >= match.Length && _stream.Slice(Position, match.Length).SequenceEqual(match);
+			=> Remaining >= match.Length && _stream.Slice(_position, match.Length).SequenceEqual(match);
 
 		public bool MatchBehind(ReadOnlySpan<char> match)
-			=> Position >= match.Length && _stream.Slice(Position - match.Length, match.Length).SequenceEqual(match);
+			=> _position >= match.Length && _stream.Slice(_position - match.Length, match.Length).SequenceEqual(match);
 
 		public bool MatchAnyAhead(SearchValues<char> match)
 			=> !IsEos && match.Contains(CurrentChar);
@@ -288,7 +290,7 @@ public static class MfmParser
 		public char               ReadAt(int position)    => _stream[position];
 		public ReadOnlySpan<char> Slice(Range range)      => _stream[range];
 		public ReadOnlySpan<char> Slice(int end)          => _stream[_position..end];
-		public ReadOnlySpan<char> SliceInclusive(int end) => _stream[_position..Math.Min(end, LastIdx)];
+		public ReadOnlySpan<char> SliceInclusive(int end) => _stream[_position..Math.Min(end, _lastIdx)];
 
 		private        int WithPosition(int offset)         => offset is -1 ? -1 : _position + offset;
 		private static int WithIndex(int offset, int index) => offset is -1 ? -1 : index + offset;
@@ -309,7 +311,7 @@ public static class MfmParser
 			if (val < 0)
 				return val;
 			val -= _offset ?? 0;
-			if (val >= _position && val <= LastIdx)
+			if (val >= _position && val <= _lastIdx)
 				return val;
 			return null;
 		}
@@ -327,7 +329,7 @@ public static class MfmParser
 			if (_skipLookup || Remaining < LookupThreshold)
 				return IndexOfAny(sv);
 
-			var key = new LookupEntry("IndexOfAny", name, null, Length + Offset);
+			var key = new LookupEntry("IndexOfAny", name, null, _length + _offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv));
 		}
 
@@ -335,10 +337,10 @@ public static class MfmParser
 
 		public int IndexOfAnyCached(SearchValues<char> sv, string name, int end)
 		{
-			if (_skipLookup || end - Position < LookupThreshold)
+			if (_skipLookup || end - _position < LookupThreshold)
 				return IndexOfAny(sv, end);
 
-			var key = new LookupEntry("IndexOfAny", name, null, end + Offset);
+			var key = new LookupEntry("IndexOfAny", name, null, end + _offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv, end));
 		}
 
@@ -347,14 +349,14 @@ public static class MfmParser
 
 		public int IndexOfAnyOffsetCached(SearchValues<char> sv, string name, int start)
 		{
-			if (_skipLookup || Length - start < LookupThreshold)
+			if (_skipLookup || _length - start < LookupThreshold)
 				return IndexOfAnyOffset(sv, start);
 
-			var key = new LookupEntry("IndexOfAny", name, null, null, start + Offset);
+			var key = new LookupEntry("IndexOfAny", name, null, null, start + _offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAnyOffset(sv, start));
 		}
 
-		public int IndexOfAnyBoundaryChar() => Mode switch
+		public int IndexOfAnyBoundaryChar() => mode switch
 		{
 			ParseMode.Full   => IndexOfAny(BoundaryCharsFull),
 			ParseMode.Inline => IndexOfAny(BoundaryCharsInline),
@@ -372,13 +374,13 @@ public static class MfmParser
 
 		public int IndexOf(char c, Range range) => WithIndex(_stream[range].IndexOf(c), range.Start.Value);
 
-		public int IndexOf(char c, int? end) => WithPosition(_stream[_position..(end ?? Length)].IndexOf(c));
+		public int IndexOf(char c, int? end) => WithPosition(_stream[_position..(end ?? _length)].IndexOf(c));
 
 		public int IndexOfCached(char c, int? end)
 		{
-			end ??= Length;
+			end ??= _length;
 
-			if (_skipLookup || end.Value - Position < LookupThreshold)
+			if (_skipLookup || end.Value - _position < LookupThreshold)
 				return IndexOf(c, end);
 
 			var key = new LookupEntry("IndexOf", null, c, end + Offset);
@@ -392,11 +394,11 @@ public static class MfmParser
 			if (_skipLookup || Remaining < LookupThreshold)
 				return IndexOf(c);
 
-			var key = new LookupEntry("IndexOf", null, c, Length + Offset);
+			var key = new LookupEntry("IndexOf", null, c, _length + _offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOf(c));
 		}
 
-		public int LastIndexOf(char c, int? end) => WithPosition(_stream[_position..(end ?? Length)].LastIndexOf(c));
+		public int LastIndexOf(char c, int? end) => WithPosition(_stream[_position..(end ?? _length)].LastIndexOf(c));
 
 		public int? IndexOfOrNull(char c)       => IndexOf(c) is var idx && idx < 0 ? null : idx;
 		public int? IndexOfOrNullCached(char c) => IndexOfCached(c) is var idx && idx < 0 ? null : idx;
