@@ -58,11 +58,11 @@ public static class MfmParser
 		private readonly ReadOnlySpan<char> _stream      = input;
 		private          bool               _closed      = false;
 		private          int                _position    = 0;
-		private          int                _length      = input.Length;
-		private          int                _lastIdx     = input.Length - 1;
+		private readonly int                _length      = input.Length;
+		private readonly int                _lastIdx     = input.Length - 1;
 		private          int                _depth       = 0;
 		private          Range?             _pendingText = null;
-		private          bool               _skipLookup  = input.Length < LookupThreshold;
+		private readonly bool               _skipLookup  = input.Length < LookupThreshold;
 
 		// These are separated to improve performance & reduce allocations
 		private AutoResizeArray<IMfmNode>       _results        = new();
