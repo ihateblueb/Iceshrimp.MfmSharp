@@ -31,7 +31,7 @@ public class MfmItalicNode(IMfmInlineNode[] children, MfmItalicNode.DelimiterTyp
 
 	public readonly DelimiterType Type = type;
 
-	IMfmInlineNode[] IMfmNode.Children => children;
+	public IMfmInlineNode[] Children => children;
 
 	public override string ToString() => Type switch
 	{
@@ -53,7 +53,7 @@ public class MfmBoldNode(IMfmInlineNode[] children, MfmBoldNode.DelimiterType ty
 
 	public readonly DelimiterType Type = type;
 
-	IMfmInlineNode[] IMfmNode.Children => children;
+	public IMfmInlineNode[] Children => children;
 
 	public override string ToString() => Type switch
 	{
@@ -74,7 +74,7 @@ public class MfmStrikeNode(IMfmInlineNode[] children, MfmStrikeNode.DelimiterTyp
 
 	public readonly DelimiterType Type = type;
 
-	IMfmInlineNode[] IMfmNode.Children => children;
+	public IMfmInlineNode[] Children => children;
 
 	public override string ToString() => Type switch
 	{
@@ -95,14 +95,14 @@ public class MfmPlainNode(string text) : IMfmInlineNode
 {
 	public readonly string Text = text;
 
-	IMfmInlineNode[] IMfmNode.Children => [new MfmTextNode(Text)];
+	public IMfmInlineNode[] Children => [new MfmTextNode(Text)];
 
 	public override string ToString() => $"<plain>{Text}</plain>";
 }
 
 public class MfmSmallNode(IMfmInlineNode[] children) : IMfmInlineNode
 {
-	IMfmInlineNode[] IMfmNode.Children => children;
+	public IMfmInlineNode[] Children => children;
 
 	public override string ToString() => $"<small>{children.Serialize(trim: false)}</small>";
 }
@@ -126,7 +126,7 @@ public class MfmMentionNode(string user, string? host) : IMfmInlineNode
 {
 	public readonly string  User = user;
 	public readonly string? Host = host;
-	public string  Acct => Host is null ? User : $"{User}@{Host}";
+	public          string  Acct => Host is null ? User : $"{User}@{Host}";
 
 	public override string ToString() => $"@{Acct}";
 }
@@ -160,7 +160,7 @@ public class MfmFnNode(string name, Dictionary<string, string?>? args, IMfmInlin
 	public readonly string                       Name = name;
 	public readonly Dictionary<string, string?>? Args = args;
 
-	IMfmInlineNode[] IMfmNode.Children => children;
+	public IMfmInlineNode[] Children => children;
 
 	private string SerializedArgs => Args is { Count: > 0 }
 		? $".{string.Join(',', Args.Select(p => p.Value != null ? $"{p.Key}={p.Value}" : $"{p.Key}"))}"
@@ -171,7 +171,7 @@ public class MfmFnNode(string name, Dictionary<string, string?>? args, IMfmInlin
 
 public class MfmQuoteNode(IMfmInlineNode[] children, bool nested = false) : IMfmInlineNode
 {
-	IMfmInlineNode[] IMfmNode.Children => children;
+	public IMfmInlineNode[] Children => children;
 
 	public override string ToString()
 	{
@@ -200,7 +200,7 @@ public class MfmMathBlockNode(string formula) : IMfmBlockNode
 
 public class MfmCenterNode(IMfmInlineNode[] children) : IMfmBlockNode
 {
-	IMfmInlineNode[] IMfmNode.Children => children;
+	public IMfmInlineNode[] Children => children;
 
 	public override string ToString() => $"<center>\n{children.Serialize(trim: false)}\n</center>";
 }
