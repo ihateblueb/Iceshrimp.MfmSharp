@@ -308,7 +308,7 @@ public static class MfmParser
 			if (val < 0)
 				return val;
 			val -= _offset ?? 0;
-			if (val >= _position)
+			if (val >= _position && val <= LastIdx)
 				return val;
 			return null;
 		}
@@ -326,7 +326,7 @@ public static class MfmParser
 			if (_skipLookup || Remaining < LookupThreshold)
 				return IndexOfAny(sv);
 
-			var key = new LookupEntry("IndexOfAny", name, null, Length);
+			var key = new LookupEntry("IndexOfAny", name, null, Length + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv));
 		}
 
@@ -337,20 +337,20 @@ public static class MfmParser
 			if (_skipLookup || end - Position < LookupThreshold)
 				return IndexOfAny(sv, end);
 
-			var key = new LookupEntry("IndexOfAny", name, null, end);
+			var key = new LookupEntry("IndexOfAny", name, null, end + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv, end));
 		}
 
-		public int IndexOfAny(SearchValues<char> sv, Range range)
-			=> WithIndex(_stream[range].IndexOfAny(sv), range.Start.Value);
+		public int IndexOfAnyOffset(SearchValues<char> sv, int start)
+			=> WithIndex(_stream[start..].IndexOfAny(sv), start);
 
-		public int IndexOfAnyCached(SearchValues<char> sv, string name, Range range)
+		public int IndexOfAnyOffsetCached(SearchValues<char> sv, string name, int start)
 		{
-			if (_skipLookup || range.GetOffsetAndLength(Length).Length < LookupThreshold)
-				return IndexOfAny(sv, range);
+			if (_skipLookup || Length - start < LookupThreshold)
+				return IndexOfAnyOffset(sv, start);
 
-			var key = new LookupEntry("IndexOfAny", name, null, range.End.Value, range.Start.Value);
-			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv, range));
+			var key = new LookupEntry("IndexOfAny", name, null, null, start + Offset);
+			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAnyOffset(sv, start));
 		}
 
 		public int IndexOfAnyBoundaryChar() => Mode switch
@@ -380,7 +380,7 @@ public static class MfmParser
 			if (_skipLookup || end.Value - Position < LookupThreshold)
 				return IndexOf(c, end);
 
-			var key = new LookupEntry("IndexOf", null, c, end);
+			var key = new LookupEntry("IndexOf", null, c, end + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOf(c, end));
 		}
 
@@ -391,7 +391,7 @@ public static class MfmParser
 			if (_skipLookup || Remaining < LookupThreshold)
 				return IndexOf(c);
 
-			var key = new LookupEntry("IndexOf", null, c, Length);
+			var key = new LookupEntry("IndexOf", null, c, Length + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOf(c));
 		}
 
@@ -883,7 +883,7 @@ public static class MfmParser
 		}
 
 		var linkStart = textEnd + 2;
-		var linkEnd   = state.IndexOfAnyCached(WhitespaceChars, nameof(WhitespaceChars), linkStart..);
+		var linkEnd   = state.IndexOfAnyOffsetCached(WhitespaceChars, nameof(WhitespaceChars), linkStart);
 
 		if (linkEnd == -1)
 			linkEnd = state.Length;
