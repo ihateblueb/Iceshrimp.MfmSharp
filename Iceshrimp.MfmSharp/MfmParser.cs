@@ -452,10 +452,10 @@ public static class MfmParser
 			public const int CloseFlag = 0;
 		}
 
-		public ref struct MaterializedRecursionInfo
+		public readonly ref struct MaterializedRecursionInfo(Span<AutoResizeArray<int>> luts)
 		{
-			public Span<AutoResizeArray<int>> Luts;
-			public Span<int>                  Pointers;
+			public readonly Span<AutoResizeArray<int>> Luts     = luts;
+			public readonly Span<int>                  Pointers = new int[luts.Length];
 		}
 
 		public MaterializedRecursionInfo BuildRecursionInfo()
@@ -512,7 +512,7 @@ public static class MfmParser
 				luts[tagIdx].Add((i + offset) | open << OpenBitIdx);
 			}
 
-			return new MaterializedRecursionInfo { Luts = luts, Pointers = new int[_tagCount] };
+			return new MaterializedRecursionInfo(luts);
 		}
 	}
 
