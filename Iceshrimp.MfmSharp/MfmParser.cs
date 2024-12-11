@@ -146,7 +146,7 @@ public static class MfmParser
 			var state = new ParserState(stream, ParseMode.Inline)
 			{
 				_depth            = _depth + 1,
-				_offset           = _position + (_offset ?? 0),
+				_offset           = _position + Offset,
 				_lookupCache      = _lookupCache,
 				_unmatchedTags    = _unmatchedTags,
 				_recursionInfo    = _recursionInfo,
@@ -311,7 +311,7 @@ public static class MfmParser
 				return null;
 			if (val < 0)
 				return val;
-			val -= _offset ?? 0;
+			val -= Offset;
 			if (val >= _position && val <= _lastIdx)
 				return val;
 			return null;
@@ -319,7 +319,7 @@ public static class MfmParser
 
 		private int SetLookup(ref LookupEntry key, int val)
 		{
-			(_lookupCache ??= [])[key] = val < 0 ? val : val + (_offset ?? 0);
+			(_lookupCache ??= [])[key] = val < 0 ? val : val + Offset;
 			return val;
 		}
 
@@ -330,7 +330,7 @@ public static class MfmParser
 			if (_skipLookup || Remaining < LookupThreshold)
 				return IndexOfAny(sv);
 
-			var key = new LookupEntry("IndexOfAny", name, null, _length + _offset);
+			var key = new LookupEntry("IndexOfAny", name, null, _length + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv));
 		}
 
@@ -341,7 +341,7 @@ public static class MfmParser
 			if (_skipLookup || end - _position < LookupThreshold)
 				return IndexOfAny(sv, end);
 
-			var key = new LookupEntry("IndexOfAny", name, null, end + _offset);
+			var key = new LookupEntry("IndexOfAny", name, null, end + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAny(sv, end));
 		}
 
@@ -353,7 +353,7 @@ public static class MfmParser
 			if (_skipLookup || _length - start < LookupThreshold)
 				return IndexOfAnyOffset(sv, start);
 
-			var key = new LookupEntry("IndexOfAny", name, null, null, start + _offset);
+			var key = new LookupEntry("IndexOfAny", name, null, null, start + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOfAnyOffset(sv, start));
 		}
 
@@ -395,7 +395,7 @@ public static class MfmParser
 			if (_skipLookup || Remaining < LookupThreshold)
 				return IndexOf(c);
 
-			var key = new LookupEntry("IndexOf", null, c, _length + _offset);
+			var key = new LookupEntry("IndexOf", null, c, _length + Offset);
 			return Lookup(ref key) ?? SetLookup(ref key, IndexOf(c));
 		}
 
