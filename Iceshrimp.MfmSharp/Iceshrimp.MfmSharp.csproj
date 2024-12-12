@@ -11,8 +11,32 @@
         <DefineConstants>$(DefineConstants);FUZZ</DefineConstants>
     </PropertyGroup>
 
+    <PropertyGroup Condition=" '$(PACK)' == 'true' ">
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
+        <PackageReference Include="Microsoft.SourceLink.Gitea" Version="8.0.0" PrivateAssets="all" />
+    </ItemGroup>
+
+    <!-- Metadata for NuGet.org -->
+    <PropertyGroup>
+        <Authors>Laura Hausmann</Authors>
+        <Description>Optimized MFM (Misskey Flavoured Markdown) parser &amp; serializer written in C#</Description>
+        <Copyright>Copyright (c) 2024 Laura Hausmann</Copyright>
+        <PackageProjectUrl>https://iceshrimp.dev/iceshrimp/Iceshrimp.MfmSharp</PackageProjectUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageTags>MFM;Fediverse;Federation;Misskey;Markdown</PackageTags>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>
