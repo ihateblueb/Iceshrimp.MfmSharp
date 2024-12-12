@@ -1,4 +1,5 @@
 # Iceshrimp.MfmSharp
+[![NuGet](https://img.shields.io/nuget/v/Iceshrimp.MfmSharp.svg?style=flat-square&label=nuget)](https://www.nuget.org/packages/Iceshrimp.MfmSharp)
 
 Iceshrimp.MfmSharp ("MFM#") is an in-house library containing an optimized MFM parser & serializer written in C#,
 using all the high performance code features .NET has added in recent years.
