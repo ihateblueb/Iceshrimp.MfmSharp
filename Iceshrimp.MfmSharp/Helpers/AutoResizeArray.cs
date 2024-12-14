@@ -7,7 +7,7 @@ namespace Iceshrimp.MfmSharp.Helpers;
 /// Modified List&lt;T&gt; that can go on the stack 
 /// </summary>
 [PublicAPI]
-public struct AutoResizeArray<T>(T[] existing)
+internal struct AutoResizeArray<T>(T[] existing)
 {
 	public AutoResizeArray() : this(EmptyArray) { }
 
