@@ -1539,7 +1539,7 @@ public static class MfmParser
 			var closeTagLutIdx = lut.FindIndex(CloseFlag, ++startIdx, null, pos, until);
 			var closeTagIdx    = closeTagLutIdx == -1 ? -1 : lut[closeTagLutIdx] & IndexBitmask;
 
-			var openTagLutIdx = closeTagIdx - pos > tag.OpenTagLength
+			var openTagLutIdx = closeTagIdx - pos >= tag.OpenTagLength
 				? lut.FindIndex(OpenFlag, startIdx, closeTagLutIdx, pos)
 				: -1;
 

@@ -33,6 +33,14 @@ public class MfmTests
 		=> AssertEquals("<b></b>", [new MfmBoldNode([], MfmBoldNode.DelimiterType.HtmlTag)]);
 
 	[TestMethod]
+	public void TestParseEmptyNestedTag()
+		=> AssertEquals("<b><b></b></b>",
+		[
+			new MfmBoldNode([new MfmBoldNode([], MfmBoldNode.DelimiterType.HtmlTag)],
+			                MfmBoldNode.DelimiterType.HtmlTag)
+		]);
+
+	[TestMethod]
 	public void TestParseNestedTag()
 	{
 		AssertEquals("<b><b>a</b></b>",
@@ -1139,8 +1147,8 @@ public class MfmTests
 		=> MfmParser.Parse((string)typeof(MfmExamples).GetMethod(name)!.Invoke(null, [])!);
 
 	#endregion MfmExamples
-	
-		private static bool MfmNodeEqual(IMfmNode a, IMfmNode b)
+
+	private static bool MfmNodeEqual(IMfmNode a, IMfmNode b)
 	{
 		if (a.GetType() != b.GetType()) return false;
 
@@ -1247,7 +1255,7 @@ public class MfmTests
 	private class MfmNodeEquality : IEqualityComparer<IMfmNode>
 	{
 		public static readonly MfmNodeEquality Instance = new();
-		
+
 		public bool Equals(IMfmNode? x, IMfmNode? y)
 		{
 			if (x == null && y == null) return true;
