@@ -12,32 +12,30 @@ public static class MfmParser
 	private const int RecursionLimit  = 20;
 	private const int LookupThreshold = 500;
 
-	public static IMfmNode[] Parse(ReadOnlySpan<char> input) => Parse(input, false);
+	public static IMfmNode[] Parse(string input) => Parse(input, false);
 
-	public static IMfmNode[] Parse(ReadOnlySpan<char> input, bool simple)
+	public static IMfmNode[] Parse(string input, bool simple)
 	{
-		input = input.Trim();
-		if (input.Length == 0) return [];
+		if (input.Length == 0)
+			return [];
+		if (input.Length > LengthLimit)
+			return [new MfmTextNode(input)];
 
-		var processed = input.ToString().ReplaceLineEndings("\n");
-		if (processed.Length == 0) return [];
-		if (processed.Length > LengthLimit) return [new MfmTextNode(processed)];
-#if !DEBUG && !FUZZ
 		try
 		{
-#endif
-			var    state = new ParserState(processed, simple ? ParseMode.Simple : ParseMode.Full);
+			var    state = new ParserState(input.AsSpan().Trim(), simple ? ParseMode.Simple : ParseMode.Full);
 			Parser func  = simple ? ParseNodeSimple : ParseNode;
-			while (!state.IsEos)
-				func(ref state);
+			while (!state.IsEos) func(ref state);
 			return state.GetResults();
-#if !DEBUG && !FUZZ
 		}
 		catch
 		{
-			return [new MfmTextNode(processed)];
+			#if DEBUG || FUZZ
+			throw;
+			#else
+			return [new MfmTextNode(input)];
+			#endif
 		}
-#endif
 	}
 
 	internal enum ParseMode
@@ -616,11 +614,11 @@ public static class MfmParser
 
 		if (state.Position == position)
 		{
-#if DEBUG || FUZZ
+			#if DEBUG || FUZZ
 			throw new Exception("Infinite loop detected!");
-#else
+			#else
 			state.UpdatePendingTextAndSeekToBoundary();
-#endif
+			#endif
 		}
 	}
 
@@ -640,11 +638,11 @@ public static class MfmParser
 
 		if (state.Position == position)
 		{
-#if DEBUG || FUZZ
+			#if DEBUG || FUZZ
 			throw new Exception("Infinite loop detected!");
-#else
+			#else
 			state.UpdatePendingTextAndSeekToBoundary();
-#endif
+			#endif
 		}
 	}
 
