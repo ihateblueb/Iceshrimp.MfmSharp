@@ -414,6 +414,9 @@ public class MfmTests
 
 		AssertEquals("test http://example.org", ["test ".ToMfm(), new MfmUrlNode("http://example.org/", false)],
 		             "test http://example.org/");
+
+		// Urlencode handling
+		AssertEquals("https://example.org/with%20space", [new MfmUrlNode("https://example.org/with%20space", false)]);
 	}
 
 	[TestMethod]
@@ -454,6 +457,9 @@ public class MfmTests
 
 		AssertEquals("test <http://example.org>", ["test ".ToMfm(), new MfmUrlNode("http://example.org/", true)],
 		             "test <http://example.org/>");
+
+		// Urlencode handling
+		AssertEquals("<https://example.org/with%20space>", [new MfmUrlNode("https://example.org/with%20space", true)]);
 	}
 
 	[TestMethod]
@@ -510,6 +516,10 @@ public class MfmTests
 		AssertEquals("test [test](http://example.org)",
 		             ["test ".ToMfm(), new MfmLinkNode("http://example.org/", "test", false)],
 		             "test [test](http://example.org/)");
+
+		// Urlencode handling
+		AssertEquals("[test](https://example.org/with%20space)",
+		             [new MfmLinkNode("https://example.org/with%20space", "test", false)]);
 	}
 
 	[TestMethod]
@@ -559,6 +569,10 @@ public class MfmTests
 		AssertEquals("test ?[test](http://example.org)",
 		             ["test ".ToMfm(), new MfmLinkNode("http://example.org/", "test", true)],
 		             "test ?[test](http://example.org/)");
+
+		// Urlencode handling
+		AssertEquals("?[test](https://example.org/with%20space)",
+		             [new MfmLinkNode("https://example.org/with%20space", "test", true)]);
 	}
 
 	[TestMethod]

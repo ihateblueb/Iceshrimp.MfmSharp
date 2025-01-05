@@ -803,7 +803,8 @@ public static class MfmParser
 			&& uri is { Scheme: "http" or "https" }
 		)
 		{
-			state.AddInlineResult(new MfmUrlNode(uri.ToString(), false));
+			var node = new MfmUrlNode(uri.GetComponents(UriComponents.AbsoluteUri, UriFormat.UriEscaped), false);
+			state.AddInlineResult(node);
 			state.SeekTo(end);
 		}
 		else
@@ -835,7 +836,8 @@ public static class MfmParser
 			&& uri is { Scheme: "http" or "https" }
 		)
 		{
-			state.AddInlineResult(new MfmUrlNode(uri.ToString(), true));
+			var node = new MfmUrlNode(uri.GetComponents(UriComponents.AbsoluteUri, UriFormat.UriEscaped), true);
+			state.AddInlineResult(node);
 			state.SeekTo(end);
 			state.Seek(1);
 		}
@@ -939,7 +941,8 @@ public static class MfmParser
 			&& uri is { Scheme: "http" or "https" }
 		)
 		{
-			state.AddInlineResult(new MfmLinkNode(uri.ToString(), state.ReadTo(textEnd).ToString(), silent));
+			var uriString = uri.GetComponents(UriComponents.AbsoluteUri, UriFormat.UriEscaped);
+			state.AddInlineResult(new MfmLinkNode(uriString, state.ReadTo(textEnd).ToString(), silent));
 			state.SeekTo(linkEnd);
 			state.Seek(1);
 		}
