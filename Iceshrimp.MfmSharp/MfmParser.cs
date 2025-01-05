@@ -966,7 +966,7 @@ public static class MfmParser
 		if (end == -1)
 			end = state.Length;
 
-		if (end - state.Position <= 1)
+		if (end - state.Position < 1)
 		{
 			state.UpdatePendingTextBehindAndSeekToBoundary(1);
 			return;

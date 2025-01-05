@@ -579,6 +579,7 @@ public class MfmTests
 	public void TestParseMention()
 	{
 		// General mention handling
+		AssertEquals("@t", [new MfmMentionNode("t", null)]);
 		AssertEquals("@test", [new MfmMentionNode("test", null)]);
 		AssertEquals("@test@instance.tld", [new MfmMentionNode("test", "instance.tld")]);
 		AssertEquals("@test_", [new MfmMentionNode("test_", null)]);
