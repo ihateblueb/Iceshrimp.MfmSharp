@@ -179,7 +179,7 @@ public class MfmQuoteNode(IMfmInlineNode[] children, bool nested = false) : IMfm
 		                                    .Split('\n')
 		                                    .Select(p => p.StartsWith('>') ? $">{p}" : $"> {p}"));
 
-		return nested ? '\n' + res + '\n' : res + '\n';
+		return nested ? '\n' + res + '\n' : res + (res.EndsWith('\n') ? "\n" : "\n\n");
 	}
 }
 

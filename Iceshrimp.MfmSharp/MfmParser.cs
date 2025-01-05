@@ -177,7 +177,7 @@ public static class MfmParser
 				_pendingText = start..end;
 			}
 		}
-		
+
 		public void UpdatePendingTextBehind(int offset) => UpdatePendingText(_position, offset);
 
 		public void UpdatePendingTextBehindAndSeekToBoundary(int offset)
@@ -1184,10 +1184,26 @@ public static class MfmParser
 
 		state.AddInlineResult(new MfmQuoteNode(results.ToArray()));
 
+		var consumeNewlines = 2;
+
+		if (lookbehind > 0 && state.ReadAt(state.Position - lookbehind) == '\n')
+		{
+			consumeNewlines--;
+			lookbehind--;
+		}
+
+		if (lookbehind > 0 && state.ReadAt(state.Position - lookbehind) == '\n')
+		{
+			consumeNewlines--;
+			lookbehind--;
+		}
+
 		if (lookbehind > 0)
 			state.UpdatePendingTextBehind(lookbehind);
 
-		if (!state.IsEos && state.CurrentChar == '\n')
+		if (consumeNewlines-- > 0 && state.MatchAhead('\n'))
+			state.Seek(1);
+		if (consumeNewlines > 0 && state.MatchAhead('\n'))
 			state.Seek(1);
 	}
 

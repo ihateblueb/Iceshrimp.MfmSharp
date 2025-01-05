@@ -637,7 +637,7 @@ public class MfmTests
 		             ],
 		             "> test\n> \n> test");
 		AssertEquals(">\n>test", [">\n".ToMfm(), new MfmQuoteNode(["test".ToMfm()])], ">\n> test");
-		AssertEquals(">test\n>", [new MfmQuoteNode(["test".ToMfm()]), "\n>".ToMfm()], "> test\n\n>");
+		AssertEquals(">test\n>", [new MfmQuoteNode(["test".ToMfm()]), ">".ToMfm()], "> test\n\n>");
 		AssertEquals(">test\n", [new MfmQuoteNode(["test".ToMfm()])], "> test");
 	}
 
@@ -671,6 +671,7 @@ public class MfmTests
 			> this is part of the second quote
 
 			> this is a third quote
+
 			and this is some plain text to close it off
 			""";
 
@@ -685,13 +686,12 @@ public class MfmTests
 				"\n".ToMfm(),
 				"this too".ToMfm()
 			]),
-			"\nthis is some plain text inbetween\n".ToMfm(),
+			"this is some plain text inbetween\n".ToMfm(),
 			new MfmQuoteNode([
 				"this is a second quote".ToMfm(),
 				"\n".ToMfm(),
 				"this is part of the second quote".ToMfm()
 			]),
-			"\n".ToMfm(),
 			new MfmQuoteNode(["this is a third quote".ToMfm()]),
 			"and this is some plain text to close it off".ToMfm()
 		];
