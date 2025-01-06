@@ -560,10 +560,10 @@ public static class MfmParser
 		SearchValues.Create(AsciiLettersAndDigits.Concat("-_.").ToArray());
 
 	private static readonly SearchValues<char> FnDescriptorAllowedChars =
-		SearchValues.Create(AsciiLettersLower.Concat(Digits).Concat("=.,_-").ToArray());
+		SearchValues.Create(AsciiLettersAndDigits.Concat("=.,_-").ToArray());
 
 	private static readonly SearchValues<char> FnKeyAllowedChars =
-		SearchValues.Create(AsciiLettersLower.Concat(Digits).Append('_').ToArray());
+		SearchValues.Create(AsciiLettersAndDigits.Append('_').ToArray());
 
 	private static readonly SearchValues<char> FnArgValueAllowedChars =
 		SearchValues.Create(AsciiLettersAndDigits.Concat("_-.").ToArray());

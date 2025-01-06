@@ -929,6 +929,8 @@ public class MfmTests
 		AssertEquals("$[test123 test]", [new MfmFnNode("test123", null, ["test".ToMfm()])]);
 		AssertEquals("$[test.a test]", [new MfmFnNode("test", new() { ["a"]   = null }, ["test".ToMfm()])]);
 		AssertEquals("$[test.a=b test]", [new MfmFnNode("test", new() { ["a"] = "b" }, ["test".ToMfm()])]);
+		AssertEquals("$[test.a=B test]", [new MfmFnNode("test", new() { ["a"] = "B" }, ["test".ToMfm()])]);
+		AssertEquals("$[test.a=1 test]", [new MfmFnNode("test", new() { ["a"] = "1" }, ["test".ToMfm()])]);
 		AssertEquals("$[test.a=b,c=e test]",
 		[ //
 			new MfmFnNode("test", new() { ["a"] = "b", ["c"] = "e" }, ["test".ToMfm()])
