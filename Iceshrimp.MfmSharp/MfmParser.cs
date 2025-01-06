@@ -566,7 +566,7 @@ public static class MfmParser
 		SearchValues.Create(AsciiLettersLower.Concat(Digits).Append('_').ToArray());
 
 	private static readonly SearchValues<char> FnArgValueAllowedChars =
-		SearchValues.Create(AsciiLettersLower.Concat(Digits).Concat("_-.").ToArray());
+		SearchValues.Create(AsciiLettersAndDigits.Concat("_-.").ToArray());
 
 	private static readonly SearchValues<string> FnArgsExcludeSequences
 		= SearchValues.Create([",,", "==", ",=", "=,"], StringComparison.Ordinal);
