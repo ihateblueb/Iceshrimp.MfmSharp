@@ -607,6 +607,18 @@ public class MfmTests
 		AssertEquals("@test@asdf.com.", [new MfmMentionNode("test", "asdf.com"), ".".ToMfm()]);
 		AssertEquals("@test.", [new MfmMentionNode("test", null), ".".ToMfm()]);
 
+		// Trailing apostrophe
+		AssertEquals("@test'", [new MfmMentionNode("test", null), "'".ToMfm()]);
+		AssertEquals("@test@test.com'", [new MfmMentionNode("test", "test.com"), "'".ToMfm()]);
+
+		// Trailing apostrophe followed by ascii
+		AssertEquals("@test's", [new MfmMentionNode("test", null), "'s".ToMfm()]);
+		AssertEquals("@test@test.com's", [new MfmMentionNode("test", "test.com"), "'s".ToMfm()]);
+
+		// Trailing double quote
+		AssertEquals("@test\"", [new MfmMentionNode("test", null), "\"".ToMfm()]);
+		AssertEquals("@test@test.com\"", [new MfmMentionNode("test", "test.com"), "\"".ToMfm()]);
+
 		// Whitespace handling
 		AssertEquals("test @test", ["test ".ToMfm(), new MfmMentionNode("test", null)]);
 		AssertEquals("@test test", [new MfmMentionNode("test", null), " test".ToMfm()]);

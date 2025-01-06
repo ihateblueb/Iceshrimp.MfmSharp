@@ -991,6 +991,24 @@ public static class MfmParser
 			localSlice = localSlice[..^1];
 		}
 
+		if (hostPartIdx == -1 && localSlice.Length > 0)
+		{
+			var earlyEndIdx = localSlice.IndexOfAny(MentionUserDisallowedChars);
+			if (earlyEndIdx != -1)
+			{
+				if (earlyEndIdx != localSlice.Length - 1
+				    && localSlice[earlyEndIdx] == ':'
+				    && AsciiLetterAndDigitChars.Contains(localSlice[earlyEndIdx + 1]))
+				{
+					state.UpdatePendingTextBehindAndSeekToBoundary(1);
+					return;
+				}
+
+				end        -= localSlice.Length - earlyEndIdx;
+				localSlice =  localSlice[..earlyEndIdx];
+			}
+		}
+
 		if (
 			localSlice.Length == 0
 			|| (hostPartIdx != -1
@@ -1007,15 +1025,6 @@ public static class MfmParser
 		{
 			hostSlice = state.Slice((hostPartIdx + 1)..end);
 			var earlyEndIdx = hostSlice.IndexOfAnyExcept(MentionHostAllowedChars);
-			if (
-				earlyEndIdx != -1
-				&& earlyEndIdx != hostSlice.Length - 1
-				&& AsciiLetterAndDigitChars.Contains(hostSlice[earlyEndIdx + 1])
-			)
-			{
-				state.UpdatePendingTextBehindAndSeekToBoundary(1);
-				return;
-			}
 
 			if (earlyEndIdx != -1)
 			{
