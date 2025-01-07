@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Version>1.2.12</Version>
+        <Version>1.2.13</Version>
         <IsPackable>true</IsPackable>
         <Configurations>Debug;Release;Fuzz</Configurations>
         <Platforms>AnyCPU</Platforms>
@@ -29,6 +29,7 @@
         <Copyright>Copyright (c) 2024 Laura Hausmann</Copyright>
         <PackageProjectUrl>https://iceshrimp.dev/iceshrimp/Iceshrimp.MfmSharp</PackageProjectUrl>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageReleaseNotes>CHANGELOG.md</PackageReleaseNotes>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -37,6 +38,7 @@
     
     <ItemGroup>
         <None Include="..\README.md" Pack="true" PackagePath="\"/>
+        <None Include="..\CHANGELOG.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>

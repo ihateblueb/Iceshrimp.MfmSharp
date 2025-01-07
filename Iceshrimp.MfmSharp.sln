@@ -8,6 +8,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "root", "root", "{B6A3D3E6-B
 	ProjectSection(SolutionItems) = preProject
 		README.md = README.md
 		LICENSE = LICENSE
+		CHANGELOG.md = CHANGELOG.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Iceshrimp.MfmSharp.Examples", "Iceshrimp.MfmSharp.Examples\Iceshrimp.MfmSharp.Examples.csproj", "{56189B5E-164C-45C4-A7A6-A8D781E3749B}"
