@@ -1,3 +1,6 @@
+### v1.2.14
+- The NuGet package now correctly references the changelog by URL
+
 ### v1.2.13
 - The NuGet package now contains this changelog
 
