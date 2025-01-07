@@ -21,7 +21,7 @@ var opts = DefaultConfig
 BenchmarkRunner.Run<Benchmarks>(opts);
 
 [MemoryDiagnoser(false)]
-[ShortRunJob]
+//[ShortRunJob]
 [HideColumns("Method", "StdDev")]
 public class Benchmarks
 {
@@ -33,15 +33,15 @@ public class Benchmarks
 	[ParamsSource(nameof(GetPayloadNames))]
 	public string PayloadName { get; set; } = null!;
 
-	private static readonly Dictionary<string, string> PayloadCache = [];
+	private string _payload = null!;
 
-	private string GetPayload(string name)
-	{
-		if (PayloadCache.TryGetValue(name, out var payload)) return payload;
-		PayloadCache[name] = payload = (string)typeof(MfmExamples).GetMethod(PayloadName)!.Invoke(null, [])!;
-		return payload;
-	}
+	[GlobalSetup]
+	public void GlobalSetup() => _payload = (string)typeof(MfmExamples).GetMethod(PayloadName)!.Invoke(null, [])!;
 
+	// We reallocate the string here because the results are nonsensical otherwise.
+	// It seems to be some artifact of the synthetic workload.
+	// Using [RunOncePerIteration] without reallocation also reproduces these results.
+	// I have no idea why, but the results match manual testing of prod-like workloads (different text in every iteration).
 	[Benchmark]
-	public void MfmSharp() => _ = MfmParser.Parse(GetPayload(PayloadName));
+	public IMfmNode[] MfmSharp() => MfmParser.Parse(_payload.AsSpan().ToString());
 }
