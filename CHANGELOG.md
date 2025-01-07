@@ -1,3 +1,7 @@
+### v1.2.15
+- When parsing quote nodes, duplicate leading newlines now get collapsed into one, preventing erroneous line breaks when rendering
+- Improved performance when parsing quote & code block nodes
+
 ### v1.2.14
 - The NuGet package now correctly references the changelog by URL
 

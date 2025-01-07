@@ -651,6 +651,10 @@ public class MfmTests
 		AssertEquals(">\n>test", [">\n".ToMfm(), new MfmQuoteNode(["test".ToMfm()])], ">\n> test");
 		AssertEquals(">test\n>", [new MfmQuoteNode(["test".ToMfm()]), ">".ToMfm()], "> test\n\n>");
 		AssertEquals(">test\n", [new MfmQuoteNode(["test".ToMfm()])], "> test");
+
+		// Newline handling
+		AssertEquals("test\n>test", ["test\n".ToMfm(), new MfmQuoteNode(["test".ToMfm()])], "test\n> test");
+		AssertEquals("test\n\n>test", ["test\n".ToMfm(), new MfmQuoteNode(["test".ToMfm()])], "test\n> test");
 	}
 
 	[TestMethod]

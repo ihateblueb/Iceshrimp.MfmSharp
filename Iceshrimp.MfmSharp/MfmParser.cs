@@ -289,9 +289,11 @@ public static class MfmParser
 		public ReadOnlySpan<char> ReadToEnd()             => _stream[_position..];
 		public ReadOnlySpan<char> ReadTo(int end)         => _stream[_position..end];
 		public char               ReadAt(int position)    => _stream[position];
+		public char?              TryReadAt(int position) => _stream.Length > position ? _stream[position] : null;
 		public ReadOnlySpan<char> Slice(Range range)      => _stream[range];
 		public ReadOnlySpan<char> Slice(int end)          => _stream[_position..end];
 		public ReadOnlySpan<char> SliceInclusive(int end) => _stream[_position..Math.Min(end, _lastIdx)];
+		public ReadOnlySpan<char> TrySlice(int end)       => _stream.Length >= end ? _stream[_position..end] : null;
 
 		private        int WithPosition(int offset)         => offset is -1 ? -1 : _position + offset;
 		private static int WithIndex(int offset, int index) => offset is -1 ? -1 : index + offset;
@@ -585,10 +587,10 @@ public static class MfmParser
 			parser = state.CurrentChar switch
 			{
 				'`'  => ParseCodeBlockOrInlineCode(state),
-				'\n' => TryParseCodeBlock(state),
+				'\n' => TryParseQuoteOrCodeBlock(state),
 				'>'  => ParseQuote,
 				'<'  => ParseTag(state),
-				'\\' => ParseInlineMathOrMathBlock(state),
+				'\\' => TryParseInlineMathOrMathBlock(state),
 				_    => null
 			};
 		}
@@ -1055,14 +1057,23 @@ public static class MfmParser
 	{
 		const int quoteRecursionLimit = 4;
 
+		var lookbehind = 0;
+		if (state.MatchAhead("\n"))
+		{
+			state.UpdatePendingTextAndSeek(1);
+			state.Seek(1);
+			lookbehind++;
+		}
+
 		if (!state.MatchNewlineBehind(true) || state.Remaining < 2)
 		{
+			state.UpdatePendingTextBehind(lookbehind);
 			state.UpdatePendingTextAndSeekToBoundary();
 			return;
 		}
 
 		state.Seek(1);
-		var lookbehind   = 1;
+		lookbehind++;
 		var currentDepth = 0;
 		while (!state.IsEos && state.CurrentChar == '>' && currentDepth < quoteRecursionLimit)
 		{
@@ -1221,15 +1232,26 @@ public static class MfmParser
 	private static Parser TryParseInlineMath(ParserState state)
 		=> state.MatchAhead("\\(") ? ParseInlineMath : ParseText;
 
-	private static Parser ParseInlineMathOrMathBlock(ParserState state)
-		=> state.MatchAhead("\\(")
-			? ParseInlineMath
-			: state.MatchAhead("\\[")
-				? ParseMathBlock
-				: ParseText;
+	private static Parser TryParseInlineMathOrMathBlock(ParserState state)
+		=> state.TryReadAt(state.Position + 1) switch
+		{
+			'(' => ParseInlineMath,
+			'[' => ParseMathBlock,
+			_   => ParseText
+		};
 
-	private static Parser TryParseCodeBlock(ParserState state)
-		=> state.MatchAhead("\n```") || state.MatchAhead("\n\n```") ? ParseCodeBlock : ParseText;
+	private static Parser TryParseQuoteOrCodeBlock(ParserState state)
+		=> state.TryReadAt(state.Position + 1) switch
+		{
+			'\n' => state.TryReadAt(state.Position + 2) switch
+			{
+				'`' => state.MatchAhead("\n\n```") ? ParseCodeBlock : ParseText,
+				'>' => ParseQuote,
+				_   => ParseText
+			},
+			'`' => state.MatchAhead("\n```") ? ParseCodeBlock : ParseText,
+			_   => ParseText
+		};
 
 	private static Parser ParseCodeBlockOrInlineCode(ParserState state)
 		=> state.IsStart && state.MatchAhead("```") ? ParseCodeBlock : ParseInlineCode;
