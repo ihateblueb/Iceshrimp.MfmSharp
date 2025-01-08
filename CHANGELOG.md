@@ -1,3 +1,6 @@
+### v1.2.16
+Ignore trailing question marks when parsing URLs
+
 ### v1.2.15
 - When parsing quote nodes, duplicate leading newlines now get collapsed into one, preventing erroneous line breaks when rendering
 - Improved performance when parsing quote & code block nodes

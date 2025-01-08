@@ -802,6 +802,14 @@ public static class MfmParser
 			}
 		}
 
+		while (state.ReadAt(end - 1) == '?')
+		{
+			end--;
+			if (end > 1) continue;
+			state.UpdatePendingTextAndSeekTo(end);
+			return;
+		}
+
 		if (
 			Uri.TryCreate(state.ReadTo(end).ToString(), UriKind.Absolute, out var uri)
 			&& uri is { Scheme: "http" or "https" }

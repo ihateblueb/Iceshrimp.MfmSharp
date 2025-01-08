@@ -417,6 +417,16 @@ public class MfmTests
 
 		// Urlencode handling
 		AssertEquals("https://example.org/with%20space", [new MfmUrlNode("https://example.org/with%20space", false)]);
+
+		// Trailing question mark handling
+		AssertEquals("https://example.org?", [new MfmUrlNode("https://example.org/", false), "?".ToMfm()],
+		             "https://example.org/?");
+
+		AssertEquals("https://example.org??", [new MfmUrlNode("https://example.org/", false), "??".ToMfm()],
+		             "https://example.org/??");
+
+		AssertEquals("https://example.org/asd?", [new MfmUrlNode("https://example.org/asd", false), "?".ToMfm()]);
+		AssertEquals("https://example.org/asd?a", [new MfmUrlNode("https://example.org/asd?a", false)]);
 	}
 
 	[TestMethod]
