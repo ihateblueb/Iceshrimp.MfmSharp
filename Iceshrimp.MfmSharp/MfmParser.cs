@@ -1520,6 +1520,7 @@ public static class MfmParser
 
 		if (
 			endIdx == -1
+			|| endIdx == state.Position
 			|| (state.Position > desc.DelimLength
 			    && !AsciiSymbolsAndWhitespaceChars.Contains(state.ReadAt(state.Position - desc.DelimLength - 1)))
 			|| (endIdx < state.Length - desc.DelimLength

@@ -143,6 +143,9 @@ public class MfmTests
 		AssertEquals("test _test_test", ["test _test_test".ToMfm()]);
 
 		AssertEquals("* test\n* test2\n* test3", ["* test\n* test2\n* test3".ToMfm()]);
+
+		AssertEquals("*****", ["*****".ToMfm()]);
+		AssertEquals("_____", ["_____".ToMfm()]);
 	}
 
 	[TestMethod]

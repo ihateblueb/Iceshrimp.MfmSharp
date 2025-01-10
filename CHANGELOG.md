@@ -1,3 +1,6 @@
+### v1.2.17
+Sequences like `*****` or `_____` are no longer incorrectly parsed as bold/italic nodes
+
 ### v1.2.16
 Ignore trailing question marks when parsing URLs
 
