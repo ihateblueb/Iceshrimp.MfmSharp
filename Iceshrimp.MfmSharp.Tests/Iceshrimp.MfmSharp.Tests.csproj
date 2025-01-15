@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FluentAssertions" Version="[7.0.0]" />
+        <PackageReference Include="Iceshrimp.Assertions" Version="1.0.0" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,6 +1,6 @@
 using System.Reflection;
 using System.Text;
-using FluentAssertions;
+using Iceshrimp.Assertions;
 using Iceshrimp.MfmSharp.Examples;
 
 namespace Iceshrimp.MfmSharp.Tests;
