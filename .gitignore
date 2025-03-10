@@ -108,3 +108,8 @@ TestResults/
 
 # macOS specific
 .DS_Store
+
+# Node
+node_modules
+.pnpm_store
+pnpm-lock.yaml

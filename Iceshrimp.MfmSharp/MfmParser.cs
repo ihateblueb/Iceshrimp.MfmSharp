@@ -1,6 +1,7 @@
 using System.Buffers;
 using Iceshrimp.MfmSharp.Helpers;
 using JetBrains.Annotations;
+using Microsoft.JavaScript.NodeApi;
 using static Iceshrimp.MfmSharp.MfmParser.ParserState.RecursionInfoConstants;
 
 namespace Iceshrimp.MfmSharp;
@@ -12,7 +13,11 @@ public static class MfmParser
 	private const int RecursionLimit  = 20;
 	private const int LookupThreshold = 500;
 
+	[JSExport("parse")]
 	public static IMfmNode[] Parse(string input) => Parse(input, false);
+
+	[JSExport("parseSimple")]
+	public static IMfmNode[] ParseSimple(string input) => Parse(input, true);
 
 	public static IMfmNode[] Parse(string input, bool simple)
 	{
@@ -1035,6 +1040,15 @@ public static class MfmParser
 		{
 			hostSlice = state.Slice((hostPartIdx + 1)..end);
 			var earlyEndIdx = hostSlice.IndexOfAnyExcept(MentionHostAllowedChars);
+			if (
+				earlyEndIdx != -1
+				&& earlyEndIdx != hostSlice.Length - 1
+				&& AsciiLetterAndDigitChars.Contains(hostSlice[earlyEndIdx + 1])
+			)
+			{
+				state.UpdatePendingTextBehindAndSeekToBoundary(1);
+				return;
+			}
 
 			if (earlyEndIdx != -1)
 			{

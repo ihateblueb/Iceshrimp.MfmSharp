@@ -1,18 +1,23 @@
 using System.Text;
 using JetBrains.Annotations;
+using Microsoft.JavaScript.NodeApi;
 
 namespace Iceshrimp.MfmSharp;
 
 [PublicAPI]
+[JSExport]
 public interface IMfmNode
 {
 	public IMfmInlineNode[] Children => [];
 }
 
+[JSExport]
 public interface IMfmInlineNode : IMfmNode;
 
+[JSExport]
 public interface IMfmBlockNode : IMfmNode;
 
+[JSExport]
 public class MfmTextNode(string text) : IMfmInlineNode
 {
 	public readonly string Text = text;
@@ -20,6 +25,7 @@ public class MfmTextNode(string text) : IMfmInlineNode
 	public override string ToString() => Text;
 }
 
+[JSExport]
 public class MfmItalicNode(IMfmInlineNode[] children, MfmItalicNode.DelimiterType type) : IMfmInlineNode
 {
 	public enum DelimiterType
@@ -42,6 +48,7 @@ public class MfmItalicNode(IMfmInlineNode[] children, MfmItalicNode.DelimiterTyp
 	};
 }
 
+[JSExport]
 public class MfmBoldNode(IMfmInlineNode[] children, MfmBoldNode.DelimiterType type) : IMfmInlineNode
 {
 	public enum DelimiterType
@@ -64,6 +71,7 @@ public class MfmBoldNode(IMfmInlineNode[] children, MfmBoldNode.DelimiterType ty
 	};
 }
 
+[JSExport]
 public class MfmStrikeNode(IMfmInlineNode[] children, MfmStrikeNode.DelimiterType type) : IMfmInlineNode
 {
 	public enum DelimiterType
@@ -84,6 +92,7 @@ public class MfmStrikeNode(IMfmInlineNode[] children, MfmStrikeNode.DelimiterTyp
 	};
 }
 
+[JSExport]
 public class MfmInlineCodeNode(string code) : IMfmInlineNode
 {
 	public readonly string Code = code;
@@ -91,6 +100,7 @@ public class MfmInlineCodeNode(string code) : IMfmInlineNode
 	public override string ToString() => $"`{Code}`";
 }
 
+[JSExport]
 public class MfmPlainNode(string text) : IMfmInlineNode
 {
 	public readonly string Text = text;
@@ -100,6 +110,7 @@ public class MfmPlainNode(string text) : IMfmInlineNode
 	public override string ToString() => $"<plain>{Text}</plain>";
 }
 
+[JSExport]
 public class MfmSmallNode(IMfmInlineNode[] children) : IMfmInlineNode
 {
 	public IMfmInlineNode[] Children => children;
@@ -107,6 +118,7 @@ public class MfmSmallNode(IMfmInlineNode[] children) : IMfmInlineNode
 	public override string ToString() => $"<small>{children.Serialize(trim: false)}</small>";
 }
 
+[JSExport]
 public class MfmEmojiCodeNode(string name) : IMfmInlineNode
 {
 	public readonly string Name = name;
@@ -114,6 +126,7 @@ public class MfmEmojiCodeNode(string name) : IMfmInlineNode
 	public override string ToString() => $":{Name}:";
 }
 
+[JSExport]
 public class MfmHashtagNode(string hashtag) : IMfmInlineNode
 {
 	public readonly string Hashtag = hashtag;
@@ -121,6 +134,7 @@ public class MfmHashtagNode(string hashtag) : IMfmInlineNode
 	public override string ToString() => $"#{Hashtag}";
 }
 
+[JSExport]
 [PublicAPI]
 public class MfmMentionNode(string user, string? host) : IMfmInlineNode
 {
@@ -131,6 +145,7 @@ public class MfmMentionNode(string user, string? host) : IMfmInlineNode
 	public override string ToString() => $"@{Acct}";
 }
 
+[JSExport]
 public class MfmUrlNode(string url, bool brackets) : IMfmInlineNode
 {
 	public readonly string Url      = url;
@@ -139,6 +154,7 @@ public class MfmUrlNode(string url, bool brackets) : IMfmInlineNode
 	public override string ToString() => Brackets ? $"<{Url}>" : Url;
 }
 
+[JSExport]
 public class MfmLinkNode(string url, string text, bool silent) : IMfmInlineNode
 {
 	public readonly string Url    = url;
@@ -148,6 +164,7 @@ public class MfmLinkNode(string url, string text, bool silent) : IMfmInlineNode
 	public override string ToString() => (Silent ? "?" : "") + $"[{Text}]({Url})";
 }
 
+[JSExport]
 public class MfmInlineMathNode(string formula) : IMfmInlineNode
 {
 	public readonly string Formula = formula;
@@ -155,6 +172,7 @@ public class MfmInlineMathNode(string formula) : IMfmInlineNode
 	public override string ToString() => $@"\({Formula}\)";
 }
 
+[JSExport]
 public class MfmFnNode(string name, Dictionary<string, string?>? args, IMfmInlineNode[] children) : IMfmInlineNode
 {
 	public readonly string                       Name = name;
@@ -169,6 +187,7 @@ public class MfmFnNode(string name, Dictionary<string, string?>? args, IMfmInlin
 	public override string ToString() => $"$[{Name}{SerializedArgs} {children.Serialize(trim: false)}]";
 }
 
+[JSExport]
 public class MfmQuoteNode(IMfmInlineNode[] children, bool nested = false) : IMfmInlineNode
 {
 	public IMfmInlineNode[] Children => children;
@@ -183,6 +202,7 @@ public class MfmQuoteNode(IMfmInlineNode[] children, bool nested = false) : IMfm
 	}
 }
 
+[JSExport]
 public class MfmCodeBlockNode(string code, string? lang) : IMfmBlockNode
 {
 	public readonly string  Code = code;
@@ -191,6 +211,7 @@ public class MfmCodeBlockNode(string code, string? lang) : IMfmBlockNode
 	public override string ToString() => $"\n```{Lang ?? ""}\n{Code}\n```\n";
 }
 
+[JSExport]
 public class MfmMathBlockNode(string formula) : IMfmBlockNode
 {
 	public readonly string Formula = formula;
@@ -198,6 +219,7 @@ public class MfmMathBlockNode(string formula) : IMfmBlockNode
 	public override string ToString() => $@"\[{Formula}\]";
 }
 
+[JSExport]
 public class MfmCenterNode(IMfmInlineNode[] children) : IMfmBlockNode
 {
 	public IMfmInlineNode[] Children => children;
@@ -207,6 +229,9 @@ public class MfmCenterNode(IMfmInlineNode[] children) : IMfmBlockNode
 
 public static class MfmExtensions
 {
+	[JSExport("toString")]
+	public static string JsToString(this IEnumerable<IMfmNode> nodes) => Serialize(nodes);
+
 	public static string Serialize(this IEnumerable<IMfmNode> nodes, bool trim = true)
 	{
 		var sb = new StringBuilder();

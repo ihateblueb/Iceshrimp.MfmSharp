@@ -14,4 +14,8 @@
         <None Remove="results\**" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Microsoft.JavaScript.NodeApi" Version="0.9.9" />
+    </ItemGroup>
+
 </Project>
